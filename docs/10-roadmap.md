@@ -28,7 +28,7 @@ Each milestone ends with a working, committed state. Check boxes as work lands.
 - [x] Deployed; Cloudflare caching of chunks + media verified (cf-cache-status: HIT)
 - [x] Published: Pokemon Gracidea 0.3.14+1.5.1+1.2.51 (stable), Asperia (coming soon), PG Bot (GitHub, unresolved)
 - [x] End-to-end install test via public URL: signatures valid, all 5708 file hashes match
-- [ ] Confirm Gracidea runs from the assembled layout (user test of out/install-test)
+- [x] Gracidea layout fixed from the GameMaker source; r2 published, starts without crashing
 - [ ] Gated content staging into data/content (with M5), `gc`, dev-only link item (with M3 link support)
 
 ## M3 — Install & launch
