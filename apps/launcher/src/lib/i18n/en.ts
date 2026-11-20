@@ -43,6 +43,7 @@ export const en = {
     notInstalled: "Not installed",
     installed: "Installed {v}",
     updateTo: "Update to {v}",
+    playAnyway: "Play {v} without updating",
     channel: "Channel",
     playtime: "Played {t}",
     size: "{s} on disk",

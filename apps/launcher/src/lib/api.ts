@@ -24,7 +24,8 @@ export const api = {
   pickFolder: (start?: string) => invoke<string | null>("pick_folder", { start }),
   diskSpace: (path: string) => invoke<number | null>("disk_space", { path }),
   openFolder: (item: string) => invoke<void>("open_folder", { item }),
-  install: (item: string, channel: string, path?: string) => invoke<Job>("install", { item, channel, path }),
+  install: (item: string, channel: string, path?: string, version?: string) =>
+    invoke<Job>("install", { item, channel, path, version }),
   pauseJob: (id: number) => invoke<void>("pause_job", { id }),
   resumeJob: (id: number) => invoke<void>("resume_job", { id }),
   cancelJob: (id: number) => invoke<void>("cancel_job", { id }),

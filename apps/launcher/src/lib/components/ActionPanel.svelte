@@ -197,6 +197,11 @@
       </Menu>
     {/if}
   </div>
+  {#if action === "update" && installed && !ch?.required && !app.running.includes(item.id)}
+    <button class="anyway" onclick={() => app.run(api.launch(item.id))}>
+      {t("item.playAnyway", { v: installed.version })}
+    </button>
+  {/if}
   {#if installed && installed.playtimeSec > 0}
     <div class="foot">{t("item.playtime", { t: duration(installed.playtimeSec) })}</div>
   {/if}
@@ -253,6 +258,8 @@
     text-shadow: 0 1px 4px rgb(0 0 0 / 0.6);
   }
   .channel {
+    flex: none;
+    white-space: nowrap;
     display: flex;
     align-items: center;
     gap: 6px;
@@ -334,6 +341,16 @@
   .more:hover,
   .more.open {
     background: rgb(40 40 46 / 0.8);
+    color: var(--text);
+  }
+  .anyway {
+    color: var(--text-2);
+    font-size: 0.85em;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-shadow: 0 1px 4px rgb(0 0 0 / 0.6);
+  }
+  .anyway:hover {
     color: var(--text);
   }
   .foot {

@@ -82,3 +82,12 @@ which can need extra build tools on Windows; SChannel needs none and uses the Wi
 
 **ADR-021 (2026-11-21) Media via the WebView HTTP cache.** Media URLs are content-hashed and immutable, so WebView2's
 own disk cache keeps them; no custom media cache yet. Revisit if art must show on a cold, offline start.
+
+**ADR-022 (2026-11-21) GitHub resolution travels unsigned next to signed items.** The server can't sign (ADR-007),
+and GitHub versions change without a publish step. So `resolved` is a separate unsigned map, and the launcher
+accepts only URLs inside the repository the signed item names. Worst case a compromised server can point at an
+older/other file *of that same repository*.
+
+**ADR-023 (2026-11-21) Non-exe launch targets use the file association, untracked.** Python apps (PG Bot from
+source) start via `run_gui.py`'s association (py launcher). Tracking would need knowing the interpreter; not worth
+it before the bot ships exe releases. `requires: python` is checked first.

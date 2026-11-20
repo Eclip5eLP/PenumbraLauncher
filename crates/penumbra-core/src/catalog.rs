@@ -88,6 +88,12 @@ pub struct Item {
     pub banners: Vec<Banner>,
     #[serde(default)]
     pub links: BTreeMap<String, String>,
+    /// How to start it, for sources without a manifest `launch` (GitHub/URL). Relative to the install folder.
+    #[serde(default)]
+    pub launch: Option<crate::manifest::Launch>,
+    /// Things that must be on the PC (checked before launch), e.g. Python.
+    #[serde(default)]
+    pub requires: Vec<Requirement>,
     /// Detached ed25519 signature over the canonical item JSON (without this field).
     #[serde(default)]
     pub sig: Option<String>,
@@ -115,7 +121,8 @@ pub struct Media {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", tag = "kind")]
+// rename_all renames the variants ("github"); rename_all_fields the variants' fields ("stripRoot").
+#[serde(rename_all = "camelCase", rename_all_fields = "camelCase", tag = "kind")]
 pub enum Source {
     Penumbra,
     Github {
@@ -158,6 +165,85 @@ pub struct Channel {
     pub mode: Option<String>,
     #[serde(default)]
     pub required: bool,
+
+    // --- GitHub channel settings (signed, set by the publisher) ---
+    /// Release mode: glob over asset names. None/no match = the release's source zip.
+    #[serde(default)]
+    pub asset: Option<String>,
+    #[serde(default)]
+    pub prerelease: bool,
+    /// Branch mode: branch name (default: the repo's default branch).
+    #[serde(default)]
+    pub branch: Option<String>,
+    /// Tag mode: glob over tag names, e.g. `v*`.
+    #[serde(default)]
+    pub tag_pattern: Option<String>,
+    /// Only install this sub-folder of the archive.
+    #[serde(default)]
+    pub path: Option<String>,
+    /// Globs of archive paths not to install.
+    #[serde(default)]
+    pub exclude: Vec<String>,
+
+    // --- Resolved download (GitHub: from the server resolver / client; URL sources: signed) ---
+    #[serde(default)]
+    pub url: Option<String>,
+    /// Hex sha256 of the downloaded file, when known.
+    #[serde(default)]
+    pub sha256: Option<String>,
+    /// Publish date (RFC 3339) of the resolved version.
+    #[serde(default)]
+    pub date: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Requirement {
+    /// `python` (more kinds later)
+    pub kind: String,
+    #[serde(default)]
+    pub version: Option<String>,
+    /// Where to get it.
+    #[serde(default)]
+    pub help: Option<String>,
+}
+
+/// GitHub download URLs a resolver may hand out for `repo` (owner/name). The repo itself is pinned by the signed
+/// catalog item, so an unsigned resolution can only point at that repository's own files.
+pub fn github_url_allowed(repo: &str, url: &str) -> bool {
+    let repo = repo.to_ascii_lowercase();
+    let url = url.to_ascii_lowercase();
+    !repo.contains("..")
+        && repo.split('/').count() == 2
+        && [
+            format!("https://github.com/{repo}/releases/download/"),
+            format!("https://codeload.github.com/{repo}/zip/"),
+        ]
+        .iter()
+        .any(|p| url.starts_with(p.as_str()))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn github_source_fields_are_camel_case() {
+        let s: super::Source =
+            serde_json::from_str(r#"{ "kind": "github", "repo": "a/b", "stripRoot": true, "unpack": false }"#).unwrap();
+        match s {
+            super::Source::Github { strip_root, unpack, .. } => assert!(strip_root && !unpack),
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn github_urls_are_pinned_to_the_repo() {
+        let r = "Eclip5eLP/Pirate-Galaxy-AFK-Bot";
+        assert!(super::github_url_allowed(r, "https://github.com/Eclip5eLP/Pirate-Galaxy-AFK-Bot/releases/download/v1/a.zip"));
+        assert!(super::github_url_allowed(r, "https://codeload.github.com/eclip5elp/pirate-galaxy-afk-bot/zip/abc123"));
+        assert!(!super::github_url_allowed(r, "https://github.com/evil/repo/releases/download/v1/a.zip"));
+        assert!(!super::github_url_allowed(r, "https://evil.com/Eclip5eLP/Pirate-Galaxy-AFK-Bot/releases/download/"));
+        assert!(!super::github_url_allowed(r, "http://github.com/Eclip5eLP/Pirate-Galaxy-AFK-Bot/releases/download/v1/a.zip"));
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

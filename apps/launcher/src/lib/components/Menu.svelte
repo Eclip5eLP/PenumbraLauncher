@@ -78,6 +78,8 @@
   .menu {
     position: absolute;
     min-width: 230px;
+    width: max-content;
+    max-width: 380px;
     padding: 6px;
     border-radius: var(--radius);
     background: var(--panel);
@@ -128,8 +130,11 @@
   }
   .label {
     flex: 1;
+    white-space: nowrap;
   }
   .hint {
+    white-space: nowrap;
+    margin-left: 12px;
     color: var(--faint);
     font-size: 0.85em;
   }

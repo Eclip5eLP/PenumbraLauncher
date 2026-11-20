@@ -26,6 +26,9 @@ pub struct Manifest {
     /// Globs of user files that updates never overwrite or delete.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub keep: Vec<String>,
+    /// Built by the launcher from a GitHub/URL archive: files carry hashes but no chunks.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub local: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -106,7 +109,7 @@ impl Manifest {
             if !seen.insert(f.path.to_lowercase()) {
                 return Err(ManifestError::Duplicate(f.path.clone()));
             }
-            if f.chunks.iter().map(|c| c.size).sum::<u64>() != f.size {
+            if !self.local && f.chunks.iter().map(|c| c.size).sum::<u64>() != f.size {
                 return Err(ManifestError::ChunkSizes(f.path.clone()));
             }
             for c in &f.chunks {
@@ -162,6 +165,7 @@ mod tests {
             files,
             dirs: vec![],
             keep: vec![],
+            local: false,
         }
     }
 

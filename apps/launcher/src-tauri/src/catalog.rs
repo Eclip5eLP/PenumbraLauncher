@@ -23,8 +23,17 @@ fn cache_file() -> std::path::PathBuf {
 
 /// Parses a catalog body, keeping only items with a valid signature.
 pub fn parse(body: &[u8], key: &VerifyingKey) -> Result<Catalog, String> {
+    parse_full(body, key).map(|(c, _)| c)
+}
+
+/// Like [`parse`], also returning the unsigned GitHub resolution map (None when the server sent none).
+pub fn parse_full(body: &[u8], key: &VerifyingKey) -> Result<(Catalog, Option<crate::github::ResolvedMap>), String> {
     let mut v: Value = serde_json::from_slice(body).map_err(|e| format!("catalog is not valid JSON: {e}"))?;
     let raw_items = v.get_mut("items").and_then(Value::as_array_mut).map(std::mem::take).unwrap_or_default();
+    let resolved = v
+        .as_object_mut()
+        .and_then(|o| o.remove("resolved"))
+        .and_then(|r| serde_json::from_value::<crate::github::ResolvedMap>(r).ok());
     let mut catalog: Catalog = serde_json::from_value(v).map_err(|e| format!("catalog format: {e}"))?;
     for raw in raw_items {
         let id = raw.get("id").and_then(Value::as_str).unwrap_or("?").to_string();
@@ -37,7 +46,10 @@ pub fn parse(body: &[u8], key: &VerifyingKey) -> Result<Catalog, String> {
             Err(e) => tracing::warn!(%id, "dropping catalog item with unknown format: {e}"),
         }
     }
-    Ok(catalog)
+    if let Some(r) = &resolved {
+        crate::github::apply(&mut catalog, r);
+    }
+    Ok((catalog, resolved))
 }
 
 /// Cached catalog from the last successful refresh (empty on first start).
@@ -94,6 +106,7 @@ pub async fn refresh(app: AppHandle) {
     };
     if resp.status() == reqwest::StatusCode::NOT_MODIFIED {
         status(&app, "ok", None);
+        crate::jobs::auto_update(&app);
         return;
     }
     if !resp.status().is_success() {
@@ -108,8 +121,13 @@ pub async fn refresh(app: AppHandle) {
             return;
         }
     };
-    let catalog = match parse(&body, &public_key()) {
-        Ok(c) => c,
+    let catalog = match parse_full(&body, &public_key()) {
+        Ok((c, Some(_))) => c,
+        Ok((mut c, None)) => {
+            // Server didn't resolve GitHub channels: ask GitHub directly.
+            crate::github::resolve_direct(&state.http, &mut c).await;
+            c
+        }
         Err(e) => {
             status(&app, "error", Some(e));
             return;
@@ -126,6 +144,7 @@ pub async fn refresh(app: AppHandle) {
     *state.catalog.write().unwrap() = catalog.clone();
     let _ = app.emit("catalog:changed", catalog);
     status(&app, "ok", None);
+    crate::jobs::auto_update(&app);
 }
 
 #[cfg(test)]

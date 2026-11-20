@@ -54,6 +54,8 @@ Optional `Authorization: Bearer <access token>` (Penumbra Account). Supports `If
   ]
 }
 ```
+GitHub items additionally get an unsigned top-level `"resolved"` map (see docs/11-sources-github.md#as-implemented-m4).
+
 Signed: the response carries `X-Penumbra-Sig: <ed25519 base64>` over the body. Personalised responses are signed
 on the fly? → No (private key must not be on the server). Instead: the server only *filters* a pre-signed list.
 Decision: the catalog is signed **per item** (`"sig"` field per item entry, signed by penumbra-pack), and the

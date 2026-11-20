@@ -213,6 +213,7 @@ mod tests {
             files,
             dirs: vec![],
             keep: keep.iter().map(|s| s.to_string()).collect(),
+            local: false,
         }
     }
 

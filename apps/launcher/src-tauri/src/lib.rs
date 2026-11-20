@@ -1,9 +1,11 @@
 //! Penumbra Launcher backend. Architecture: docs/02-architecture.md, docs/05-launcher-app.md.
 
+mod archive;
 mod catalog;
 mod commands;
 mod engine;
 mod error;
+mod github;
 mod jobs;
 mod library;
 mod net;
@@ -80,6 +82,14 @@ pub fn run() {
             let resume = state.settings.lock().unwrap().resume_on_start;
             state.jobs.restore(resume);
             state.jobs.start(handle.clone());
+            // Keep the catalog fresh while the launcher stays open (new versions -> update badges / auto-update).
+            let h2 = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    tokio::time::sleep(Duration::from_secs(30 * 60)).await;
+                    catalog::refresh(h2.clone()).await;
+                }
+            });
             // Safety net: never leave an invisible app if the UI fails to report its first paint.
             tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(Duration::from_secs(3)).await;

@@ -16,14 +16,25 @@ if (!is_array($meta)) {
 }
 $user = pl_user();
 
+require __DIR__ . '/_github.php';
+
 $visible = [];
-foreach (pl_catalog_items() as $it) {
-    if (pl_can_list((string)($it['data']['access'] ?? 'public'), $user)) {
-        $visible[] = $it['raw'];
+$resolved = [];
+foreach (pl_catalog_items() as $id => $it) {
+    if (!pl_can_list((string)($it['data']['access'] ?? 'public'), $user)) {
+        continue;
+    }
+    $visible[] = $it['raw'];
+    if (($it['data']['source']['kind'] ?? '') === 'github') {
+        $r = pl_github_resolve($it['data']);
+        if ($r) {
+            $resolved[$id] = $r;
+        }
     }
 }
 
 unset($meta['items']);
+$meta['resolved'] = (object)$resolved;
 $head = json_encode($meta, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 $body = substr($head, 0, -1) . ',"items":[' . implode(',', $visible) . ']}';
 

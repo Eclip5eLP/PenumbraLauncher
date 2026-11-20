@@ -100,14 +100,12 @@ fn installable(state: &AppState, item: &str, channel: &str) -> AppResult<(penumb
     if it.kind == ItemType::Link || it.status == ItemStatus::ComingSoon {
         return Err(AppError::InvalidState(format!("{} can't be installed", it.name)));
     }
-    if !matches!(it.source, None | Some(penumbra_core::catalog::Source::Penumbra)) {
-        return Err(AppError::InvalidState("GitHub downloads arrive in the next update (M4).".into()));
+    let ch = it.channels.get(channel).ok_or_else(|| AppError::InvalidState(format!("no channel {channel}")))?;
+    let version = ch.version.clone().ok_or_else(|| AppError::InvalidState("nothing published on this channel yet".into()))?;
+    let archive = matches!(it.source, Some(penumbra_core::catalog::Source::Github { .. } | penumbra_core::catalog::Source::Url { .. }));
+    if archive && ch.url.is_none() {
+        return Err(AppError::InvalidState("no download available for this version yet".into()));
     }
-    let version = it
-        .channels
-        .get(channel)
-        .and_then(|c| c.version.clone())
-        .ok_or_else(|| AppError::InvalidState("nothing published on this channel yet".into()))?;
     Ok((it, version))
 }
 
@@ -130,8 +128,20 @@ fn check_install_dir(path: &Path, item: &str) -> AppResult<()> {
 }
 
 #[tauri::command]
-pub fn install(state: State<'_, AppState>, item: String, channel: String, path: Option<String>) -> AppResult<JobView> {
-    let (it, version) = installable(&state, &item, &channel)?;
+pub fn install(
+    state: State<'_, AppState>,
+    item: String,
+    channel: String,
+    path: Option<String>,
+    version: Option<String>,
+) -> AppResult<JobView> {
+    let (it, latest) = installable(&state, &item, &channel)?;
+    // Developer mode may install an older published version (testing updates, rollbacks).
+    let version = match version {
+        Some(v) if state.settings.lock().unwrap().dev_mode && penumbra_core::chunk::is_valid_version(&v) => v,
+        Some(_) => return Err(AppError::InvalidState("picking a version needs developer mode".into())),
+        None => latest,
+    };
     let installed = state.library.lock().unwrap().get(&item).cloned();
     match installed {
         Some(i) if i.version == version && i.channel == channel => {
@@ -297,7 +307,12 @@ pub fn launch(app: AppHandle, state: State<'_, AppState>, item: String) -> AppRe
     let root = PathBuf::from(&inst.path);
     let manifest = library::read_manifest(&root)
         .ok_or_else(|| AppError::InvalidState("Install data is missing. Use Verify & repair.".into()))?;
-    let launch = manifest.launch.clone().ok_or_else(|| AppError::InvalidState("nothing to launch".into()))?;
+    // GitHub/URL installs have no publisher manifest: the signed catalog item says what to start.
+    let launch = manifest
+        .launch
+        .clone()
+        .or_else(|| state.item(&item).and_then(|i| i.launch))
+        .ok_or_else(|| AppError::InvalidState("nothing to launch".into()))?;
     validate_rel_path(&launch.exe).map_err(|e| AppError::InvalidState(e.to_string()))?;
     let exe = root.join(&launch.exe);
     if !exe.is_file() {
@@ -307,6 +322,21 @@ pub fn launch(app: AppHandle, state: State<'_, AppState>, item: String) -> AppRe
         Some(w) if validate_rel_path(w).is_ok() => root.join(w),
         _ => exe.parent().unwrap_or(&root).to_path_buf(),
     };
+    if let Some(it) = state.item(&item) {
+        check_requirements(&it.requires)?;
+    }
+    // Scripts and other non-exe targets start through their Windows file association (not tracked).
+    if !launch.exe.to_lowercase().ends_with(".exe") {
+        tracing::info!(%item, target = %exe.display(), "opening via file association");
+        app.opener().open_path(exe.to_string_lossy(), None::<&str>).map_err(|e| AppError::InvalidState(format!("can't start: {e}")))?;
+        let lib = state.update_library(|lib| {
+            if let Some(i) = lib.get_mut(&item) {
+                i.last_played = Some(now_unix());
+            }
+        });
+        let _ = app.emit("library:changed", lib);
+        return Ok(());
+    }
     let tracked = crate::process::launch(&exe, &launch.args, &cwd).map_err(|e| AppError::InvalidState(format!("can't start: {e}")))?;
     tracing::info!(%item, exe = %exe.display(), "launched");
     state.running.lock().unwrap().insert(item.clone(), Instant::now());
@@ -355,4 +385,21 @@ pub fn open_item_link(app: AppHandle, state: State<'_, AppState>, item: String, 
         return Err(AppError::InvalidState("only https links can be opened".into()));
     }
     app.opener().open_url(url, None::<&str>).map_err(|e| AppError::InvalidState(e.to_string()))
+}
+
+/// Checks `requires` entries. Only Python for now: `py.exe` / `python.exe` on PATH.
+fn check_requirements(reqs: &[penumbra_core::catalog::Requirement]) -> AppResult<()> {
+    for r in reqs {
+        if r.kind == "python" {
+            let found = std::env::var_os("PATH")
+                .map(|p| std::env::split_paths(&p).any(|d| d.join("py.exe").is_file() || d.join("python.exe").is_file()))
+                .unwrap_or(false);
+            if !found {
+                let v = r.version.as_deref().map(|v| format!(" {v}")).unwrap_or_default();
+                let help = r.help.as_deref().map(|h| format!(" Get it from {h}")).unwrap_or_default();
+                return Err(AppError::InvalidState(format!("This needs Python{v} installed.{help}")));
+            }
+        }
+    }
+    Ok(())
 }

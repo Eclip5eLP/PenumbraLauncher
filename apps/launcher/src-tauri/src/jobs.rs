@@ -113,6 +113,11 @@ impl JobManager {
         self.inner.lock().unwrap().entries.iter().map(|e| e.view.clone()).collect()
     }
 
+    /// A failed job for this item in this session: don't retry automatically (the user sees the error).
+    pub fn recently_failed(&self, item: &str) -> bool {
+        self.inner.lock().unwrap().entries.iter().any(|e| e.view.item == item && e.view.state == JobState::Error)
+    }
+
     pub fn has_active_job(&self, item: &str) -> bool {
         self.inner.lock().unwrap().entries.iter().any(|e| e.view.item == item && !e.view.state.is_finished())
     }
@@ -358,6 +363,9 @@ impl JobManager {
                     e.view.state = JobState::Done;
                     e.view.note = o.note;
                     e.view.downloaded = e.view.total;
+                    if let Some(v) = o.version {
+                        e.view.version = v;
+                    }
                     installed = Some((e.view.item.clone(), e.view.version.clone(), e.view.channel.clone(), e.view.path.clone(), o.size));
                     tracing::info!(item = %e.view.item, version = %e.view.version, written = o.written, "job done");
                 }
@@ -397,6 +405,31 @@ impl JobManager {
                 let _ = s.save();
             }
             let _ = app.emit("library:changed", lib);
+        }
+    }
+}
+
+/// Queues updates for installed items whose channel moved on (setting `autoUpdateGames`). Skips running items and
+/// items that already have a job. Called after every catalog refresh.
+pub fn auto_update(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    if !state.settings.lock().unwrap().auto_update_games {
+        return;
+    }
+    let lib = state.library.lock().unwrap().clone();
+    for (id, inst) in lib {
+        let Some(item) = state.item(&id) else { continue };
+        let Some(latest) = item.channels.get(&inst.channel).and_then(|c| c.version.clone()) else { continue };
+        if latest == inst.version
+            || state.running.lock().unwrap().contains_key(&id)
+            || state.jobs.has_active_job(&id)
+            || state.jobs.recently_failed(&id)
+        {
+            continue;
+        }
+        match state.jobs.enqueue(&id, JobKind::Update, &inst.channel, &latest, &inst.path) {
+            Ok(_) => tracing::info!(item = %id, from = %inst.version, to = %latest, "auto-update queued"),
+            Err(e) => tracing::warn!(item = %id, "auto-update not queued: {e}"),
         }
     }
 }

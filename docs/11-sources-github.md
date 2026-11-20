@@ -39,6 +39,19 @@ Each **channel** of a GitHub item picks its own mode, so one item can offer e.g.
 Optional per-channel filters: `path` (only install a sub-folder of the repo/archive, e.g. `dist/`),
 `exclude` (globs not to install, e.g. `.github/**`, `tests/**`).
 
+### As implemented (M4)
+- Channel settings (`mode`, `asset`, `prerelease`, `branch`, `tagPattern`, `path`, `exclude`) live in the item's
+  `channels` map; `source` holds `repo`, `stripRoot`, `unpack`, `keep`. Item-level `launch` (exe/args, relative to
+  the install) and `requires` replace the manifest's launch info for archive installs.
+- `catalog.php` adds an unsigned top-level `resolved: { <item>: { <channel>: { version, url, download, sha256,
+  date } } }` (server `api/v1/_github.php`). The launcher applies an entry only if its URL starts with
+  `https://github.com/<repo>/releases/download/` or `https://codeload.github.com/<repo>/zip/` (ADR-022).
+- No `resolved` key at all (old server) -> the launcher resolves against the GitHub API itself (`github.rs`).
+- Install: `archive.rs` (download cache `%LOCALAPPDATA%\Penumbra Launcher\cache\downloads\<item>\`, deleted after
+  install), local manifest (`"local": true`, hashes without chunks) in `.penumbra/manifest.json`.
+- Launch targets that aren't `.exe` (e.g. `run_gui.py`) open through their Windows file association and aren't
+  tracked as running (ADR-023).
+
 ### How updates are found
 1. **Server resolver (primary):** `catalog.php` resolves every GitHub channel via the GitHub API
    (`releases`, `commits/<branch>`, `tags`) and embeds the result (`version`, download URL, size, `sha256` digest

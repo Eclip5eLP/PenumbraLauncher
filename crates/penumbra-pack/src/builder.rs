@@ -128,6 +128,7 @@ pub fn build(ws: &Workspace, args: BuildArgs) -> Result<()> {
         files,
         dirs,
         keep: args.spec.keep.clone(),
+        local: false,
     };
     if let Some(l) = &manifest.launch
         && !manifest.files.iter().any(|f| f.path.eq_ignore_ascii_case(&l.exe))

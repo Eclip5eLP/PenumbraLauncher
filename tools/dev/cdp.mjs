@@ -40,7 +40,30 @@ try {
   if (mode === "eval") console.log(JSON.stringify(await evaluate(a), null, 1));
   else if (mode === "invoke")
     console.log(JSON.stringify(await evaluate(`window.__TAURI_INTERNALS__.invoke(${JSON.stringify(a)}, ${b ?? "{}"})`), null, 1));
-  else if (mode === "shot") {
+  else if (mode === "call") {
+    // invoke and print the result or the error object (doesn't throw)
+    const r = await evaluate(
+      `window.__TAURI_INTERNALS__.invoke(${JSON.stringify(a)}, ${b ?? "{}"}).then(v => ({ ok: v ?? null }), e => ({ err: e }))`,
+    );
+    console.log(JSON.stringify(r));
+    if (r.err) process.exitCode = 2;
+  } else if (mode === "wait-job") {
+    // waits until the newest job finishes; prints progress every 2 s; timeout in seconds (default 300)
+    const deadline = Date.now() + Number(a ?? 300) * 1000;
+    for (;;) {
+      const b2 = await evaluate(`window.__TAURI_INTERNALS__.invoke("get_bootstrap")`);
+      const j = b2.jobs.at(-1);
+      if (!j) throw new Error("no jobs");
+      const mb = (n) => (n / 1e6).toFixed(1);
+      console.log(`${j.kind} ${j.item} ${j.version}: ${j.state} ${mb(j.downloaded)}/${mb(j.total)} MB ${mb(j.speed)} MB/s ${j.note ?? ""}${j.error ?? ""}`);
+      if (["done", "error", "cancelled"].includes(j.state)) {
+        if (j.state !== "done") process.exitCode = 3;
+        break;
+      }
+      if (Date.now() > deadline) throw new Error("timeout");
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  } else if (mode === "shot") {
     const r = await send("Page.captureScreenshot", { format: "png" });
     (await import("node:fs")).writeFileSync(a, Buffer.from(r.result.data, "base64"));
     console.log("saved", a);

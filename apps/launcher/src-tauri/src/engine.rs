@@ -64,6 +64,8 @@ pub struct Outcome {
     pub size: u64,
     pub written: usize,
     pub note: Option<String>,
+    /// The version actually installed, when it differs from the one queued (GitHub channels move).
+    pub version: Option<String>,
 }
 
 type R<T> = Result<T, String>;
@@ -74,6 +76,11 @@ fn io<E: std::fmt::Display>(ctx: &str) -> impl Fn(E) -> String + '_ {
 
 pub async fn run(app: AppHandle, spec: Spec, prog: Arc<Progress>) -> R<Outcome> {
     let state = app.state::<AppState>();
+    if let Some(item) = state.item(&spec.item)
+        && matches!(item.source, Some(penumbra_core::catalog::Source::Github { .. } | penumbra_core::catalog::Source::Url { .. }))
+    {
+        return crate::archive::run(app.clone(), spec, item, prog).await;
+    }
     prog.phase.store(PHASE_PREPARING, Ordering::Relaxed);
     let (manifest, manifest_bytes) = fetch_manifest(&state, &spec.item, &spec.version).await?;
     let install = spec.path.clone();
@@ -150,7 +157,7 @@ pub async fn run(app: AppHandle, spec: Spec, prog: Arc<Progress>) -> R<Outcome> 
         Kind::Repair => Some(format!("Repaired {written} file{}.", if written == 1 { "" } else { "s" })),
         _ => None,
     };
-    Ok(Outcome { size: manifest.total_size, written, note })
+    Ok(Outcome { size: manifest.total_size, written, note, version: None })
 }
 
 /// Removes everything a cancelled job left behind. A cancelled fresh install also removes the folder it created.
@@ -168,6 +175,7 @@ pub fn discard(install: &Path, fresh: bool) {
 fn discard_once(install: &Path, fresh: bool) {
     let meta = library::meta_dir(install);
     let _ = std::fs::remove_dir_all(meta.join("staging"));
+    let _ = std::fs::remove_dir_all(meta.join("staging-tree"));
     let _ = std::fs::remove_file(meta.join("journal.txt"));
     if fresh && !meta.join("manifest.json").exists() {
         let _ = std::fs::remove_dir(&meta);
@@ -271,7 +279,7 @@ fn survey_and_plan(new: &Manifest, old: Option<&Manifest>, install: &Path, deep:
     Ok(plan::plan(new, old, &lookup))
 }
 
-fn hash_file(p: &Path) -> std::io::Result<String> {
+pub fn hash_file(p: &Path) -> std::io::Result<String> {
     let mut h = blake3::Hasher::new();
     h.update_reader(std::io::BufReader::with_capacity(1 << 20, std::fs::File::open(p)?))?;
     Ok(h.finalize().to_hex().to_string())
@@ -390,7 +398,7 @@ async fn fetch_and_write(app: &AppHandle, c: &ChunkFetch, plan: &Plan, staging: 
     Err(format!("chunk {} failed after 5 attempts: {last}", &c.hash[..12]))
 }
 
-async fn wait_while_game_runs(state: &AppState) {
+pub async fn wait_while_game_runs(state: &AppState) {
     loop {
         let pause = state.settings.lock().unwrap().pause_while_running && !state.running.lock().unwrap().is_empty();
         if !pause {

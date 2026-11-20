@@ -43,13 +43,16 @@ Each milestone ends with a working, committed state. Check boxes as work lands.
 - [ ] Move install, `installer` items, mirror failover, custom media cache for fully offline art (later)
 
 ## M4 — Updates
-- [ ] Delta plan incl. local chunk reuse + `keep` rules; tests with synthetic versions
-- [ ] Update detection, auto-update, update-before-play dialog, channels (stable/beta)
-- [ ] Bandwidth limit, connections setting, pause while running
-- [ ] `github` + `url` sources: per-channel modes (release / branch / tag), server resolver + cache, client fallback,
-      range-resume, sha256, local manifest, `keep`
-- [ ] `requires` check (Python) + Pirate Galaxy AFK Bot item
-- [ ] `penumbra-pack import-github`
+- [x] Delta plan incl. local chunk reuse + `keep` rules (unit tests + real r1 -> r2 update: 9.5 MB downloaded,
+      124 MB reused locally, 5687 old files removed)
+- [x] Update detection, auto-update (after every catalog refresh, every 30 min), "Play <old> without updating",
+      channel switching; developer mode can install an older version (`install` with `version`)
+- [x] Bandwidth limit, connections setting, pause while running (M3)
+- [x] `github` + `url` sources: per-channel modes (release / branch / tag), server resolver (catalog `resolved` map,
+      10 min cache), client fallback, Range resume, sha256 (when GitHub publishes one), local manifest, `keep`,
+      strip root / sub-folder / excludes, repair
+- [x] `requires` check (Python on PATH) + non-exe launch via file association; PG Bot `dev` channel installable
+- [ ] `penumbra-pack import-github` (only needed for private repos — later)
 
 ## M5 — Accounts
 - [ ] Device sign-in dialog, keyring, refresh mutex, sign-out, account chip

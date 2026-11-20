@@ -20,6 +20,9 @@ export interface Channel {
   access?: string | null;
   mode?: "release" | "branch" | "tag" | null;
   required?: boolean;
+  url?: string | null;
+  sha256?: string | null;
+  date?: string | null;
 }
 
 export interface NewsPost {
