@@ -1,0 +1,3 @@
+# Penumbra Launcher server root (https://eclip5e.com/penumbra/). Docs: docs/04-server.md
+Options -Indexes
+DirectoryIndex index.php

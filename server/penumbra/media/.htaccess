@@ -1,0 +1,7 @@
+# Media file names contain their content hash: cache forever.
+<IfModule mod_headers.c>
+  Header set Cache-Control "public, max-age=31536000, immutable"
+</IfModule>
+<FilesMatch "\.php$">
+  Require all denied
+</FilesMatch>

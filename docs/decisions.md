@@ -57,3 +57,17 @@ separate setting, and lets one item offer stable releases and bleeding-edge buil
 
 **ADR-015 (2026-11-20) No license file.** User chose GitHub's default (no license = all rights reserved; the public
 repo is source-available, not open source). Revisit if contributions or reuse are wanted.
+
+**ADR-016 (2026-11-20) Small files are packed into shared chunks.** Gracidea has 5683 files under 1 MiB; one
+request per file would make installs slow over Cloudflare. Files < 1 MiB are concatenated (path order) into packs
+closed at 4 MiB or at a content-defined boundary above 1 MiB; a file is a slice (`offset`, `size`, `len`).
+Result: 5708 files -> 71 chunks; editing one file re-downloads one pack (~0.6-4 MB). Supersedes the "later" note
+in ADR-005.
+
+**ADR-017 (2026-11-20) Catalog = signed JSON lines, passed through byte-for-byte.** Each item is signed over its
+canonical JSON (sorted keys, no whitespace; implemented by hand so serde_json's `preserve_order` feature can't
+change it). The server stores `items.jsonl` and only filters lines by access rule, never re-encodes (PHP would turn
+`{}` into `[]`). Media get content-hashed names so they can be cached forever.
+
+**ADR-018 (2026-11-20) Published versions are immutable.** Cloudflare edge-caches manifests for hours (its browser
+TTL overrides our 5 min), so a version string is never reused; `build` checks the server and refuses.

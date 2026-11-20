@@ -5,5 +5,7 @@
 //! - [`paths`]: validation of relative install paths (no traversal, no reserved Windows names)
 
 pub mod catalog;
+pub mod chunk;
 pub mod manifest;
 pub mod paths;
+pub mod sign;

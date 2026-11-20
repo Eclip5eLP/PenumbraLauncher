@@ -56,7 +56,8 @@ Both hosts sit behind Cloudflare (tunnel → Nginx Proxy Manager → Apache/PHP 
 /crates/penumbra-core/      manifest.rs, chunker.rs, hash.rs, delta.rs, sign.rs, paths.rs (validation)
 /crates/penumbra-pack/      CLI (clap): build, upload, promote, list, gc, keygen, verify
 /server/penumbra/           PHP API, .htaccess, landing page; deploy with tools/deploy-server.ps1
-/catalog/                   items/<id>.json + art sources; published by penumbra-pack
+/catalog/                   catalog.json + <id>/{item.json,build.toml,media/} (private branch); published by penumbra-pack
+/keys/                      manifest_ed25519.pub (public signing key)
 /tools/                     deploy-server.ps1, release.ps1, dev-server.ps1
 /docs/
 ```

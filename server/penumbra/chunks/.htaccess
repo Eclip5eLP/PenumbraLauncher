@@ -1,0 +1,11 @@
+# Content-addressed chunks never change: cache forever (browser + Cloudflare edge).
+<IfModule mod_headers.c>
+  Header set Cache-Control "public, max-age=31536000, immutable"
+  Header unset Content-Security-Policy
+</IfModule>
+<IfModule mod_mime.c>
+  AddType application/octet-stream .bin
+</IfModule>
+<FilesMatch "\.php$">
+  Require all denied
+</FilesMatch>

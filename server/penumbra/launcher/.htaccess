@@ -1,0 +1,6 @@
+# Launcher installers + updater manifests (latest.json). latest*.json must not be cached long.
+<IfModule mod_headers.c>
+  <FilesMatch "\.json$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

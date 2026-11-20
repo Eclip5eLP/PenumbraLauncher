@@ -1,0 +1,2 @@
+# Catalog source files are only served through api/v1/catalog.php (which filters restricted items).
+Require all denied

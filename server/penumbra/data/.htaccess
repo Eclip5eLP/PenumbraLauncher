@@ -1,0 +1,2 @@
+# Private: gated manifests, caches. Never served directly.
+Require all denied

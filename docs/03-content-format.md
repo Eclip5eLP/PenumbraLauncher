@@ -24,40 +24,43 @@ Special cases:
 
 ## Chunk store (server)
 - Path: `/penumbra/chunks/<first 2 hex>/<blake3 hex of uncompressed data>.bin`
-- Content: zstd frame of the chunk data. Launcher verifies BLAKE3 of the **decompressed** data.
-- Immutable: `Cache-Control: public, max-age=31536000, immutable`. `.bin` extension so Cloudflare caches it by
-  default (to verify; a Cache Rule for `/penumbra/chunks/*` is the robust fix).
-- Chunk params: FastCDC min 1 MiB / avg 4 MiB / max 16 MiB. Files < 1 MiB are one chunk each.
-  (Many tiny files → many tiny requests; acceptable for now. Possible later: pack small files into shared
-  "bundle chunks". Recorded as an option in decisions.md.)
+- Content: zstd frame (level 19) of the chunk data. Launcher verifies BLAKE3 of the **decompressed** data.
+- Immutable: `Cache-Control: public, max-age=31536000, immutable`. Cloudflare caches `.bin` by default —
+  verified 2026-11-20 (`cf-cache-status: HIT` on every chunk of a second download).
+- Big files (>= 1 MiB): FastCDC min 1 MiB / avg 4 MiB / max 16 MiB.
+- **Small files (< 1 MiB) are packed** (ADR-016): concatenated in path order into shared pack chunks, closed at
+  4 MiB or, above 1 MiB, at a content-defined boundary (file hash first byte < 32). Gracidea: 5708 files -> 71
+  chunks. A file inside a pack is a slice: `offset` + `size` into the pack, `len` = pack length.
+- Constants live in `penumbra-core::chunk`.
 
 ## Manifest (one per item version)
-Stored at `/penumbra/content/<item>/manifests/<version>.json.zst`, signed.
+Stored at `/penumbra/content/<item>/<version>.json.zst` (zstd) + `<version>.json.sig` (base64 ed25519 over the
+exact uncompressed JSON bytes). Gated items will go to `data/content/` and only be served by `manifest.php`
+(M5). Versions are **immutable**: `build` refuses a version that already exists on the server, because Cloudflare
+edge-caches manifests for hours.
 
 ```jsonc
 {
   "format": 1,
   "item": "gracidea",
-  "version": "1.2.2",
-  "created": "2026-11-20T20:00:00Z",
-  "total_size": 734003200,          // installed size
-  "download_size": 512000000,       // sum of compressed chunk sizes (full install)
-  "launch": {                        // optional, can be overridden per channel in catalog
-    "exe": "Pokemon - Gracidea Version.exe",
-    "args": [], "workdir": ".", "admin": false
-  },
+  "version": "0.3.14+1.5.1+1.2.51",
+  "created": "2026-11-20T22:10:00Z",
+  "totalSize": 175798971,            // installed size
+  "downloadSize": 146068838,         // sum of distinct compressed chunks (full install)
+  "launch": { "exe": "Pokemon - Gracidea Version.exe", "args": [], "admin": false },
   "files": [
-    { "path": "Pokemon - Gracidea Version.exe", "size": 123456, "hash": "<blake3>",
-      "exec": true,
-      "chunks": [ { "hash": "<blake3>", "size": 123456, "csize": 60000 } ] }
+    { "path": "Pokemon - Gracidea Version.exe", "size": 4512768, "hash": "<blake3>", "exec": true,
+      "chunks": [ { "hash": "<blake3>", "size": 4512768, "csize": 1800000 } ] },
+    { "path": "items.ini", "size": 93687, "hash": "<blake3>",
+      "chunks": [ { "hash": "<pack blake3>", "size": 93687, "csize": 2100000, "offset": 811008, "len": 4194304 } ] }
   ],
-  "dirs": ["Saves"],                 // empty dirs to create
-  "keep": ["Saves/**", "*.ini"]      // never overwritten/deleted on update (user data); optional
+  "dirs": ["empty/dir"],             // empty dirs to create
+  "keep": ["options.ini"]            // never overwritten/deleted on update (user data)
 }
 ```
-Signature: detached ed25519 over the exact bytes of the uncompressed JSON, in `<version>.json.sig`
-(and inline in the gated PHP response). Public key is compiled into the launcher; private key in
-`C:\Eclip5eDev\keys\manifest_ed25519.key`.
+Public key: `keys/manifest_ed25519.pub` (in git, compiled into the launcher). Private key:
+`C:\Eclip5eDev\keys\manifest_ed25519.key` (base64 seed; never in git). Catalog items are signed with the same key
+over their canonical JSON (`penumbra-core::sign`, ADR-017).
 
 Path rules (enforced in `penumbra-core::paths`, both at publish and install): relative, `/` separators, no `..`,
 no drive letters, no reserved Windows names (CON, NUL, ...), no trailing dots/spaces, case-insensitive unique.
@@ -82,20 +85,46 @@ comparing strings. The installed manifest is kept in `<install>/.penumbra/manife
 verify, also offline).
 
 ## Publisher CLI: `penumbra-pack`
+Run from the repo root. Config: `tools/private/pack.toml` (server ssh target, `run_as`, root path, public URL,
+key paths) or `--config` / `$PENUMBRA_PACK_CONFIG`.
+
 ```
-penumbra-pack keygen                         # creates manifest signing keypair (once)
-penumbra-pack build  --item gracidea --version 1.2.3 --input <dir|zip> [--no-unpack] [--exe ...]
-                     -> out/<item>/<version>/ (manifest + new chunks only, compares with server chunk index)
-penumbra-pack upload --item gracidea --version 1.2.3      # rsync/scp over SSH to the server, chunks first, manifest last
-penumbra-pack promote --item gracidea --version 1.2.3 --channel stable   # edits catalog, signs, uploads catalog
-penumbra-pack list   [--item ...]                          # versions per channel, sizes, chunk reuse stats
-penumbra-pack gc     [--keep 3]                            # deletes chunks not referenced by kept versions
-penumbra-pack verify --item ... --version ...              # checks that every chunk exists on the server
-penumbra-pack import-github --item ... --tag ...           # GitHub release → penumbra version (private repos, delta)
+penumbra-pack keygen                                   # manifest/catalog keypair (once; refuses to overwrite)
+penumbra-pack build   --item <id> --version <v> --input <dir|zip> [--level 19] [--offline]
+penumbra-pack promote --item <id> --version <v> [--channel stable]   # sets channel, re-signs + stages catalog
+penumbra-pack catalog                                  # re-sign + stage catalog after editing metadata/news/media
+penumbra-pack upload  [--dry-run]                      # ships out/stage: chunks -> media -> manifests -> catalog
+penumbra-pack list    [--item <id>]
+penumbra-pack verify  --item <id> --version <v>        # all chunks + manifest present on the server?
+penumbra-pack deploy-server                            # server/penumbra code -> server root (never deletes)
+penumbra-pack install-test --item <id> [--channel stable] --dest <dir>   # end-to-end check via public URL
 ```
-- Knows existing chunks via `/penumbra/chunks/index.txt`-style listing fetched over SSH (`find`), so only new
-  chunks are compressed and uploaded.
-- Cross-platform: can run **on the server** (Linux build in Docker) to import zips that already live in `www/`
-  (e.g. `development/Gracidea/data/PokemonGracidea.zip`) without re-uploading them through home upload.
-- Upload order guarantees consistency: chunks → manifest → catalog. Clients never see a manifest whose chunks are
-  missing.
+Not yet: `gc` (delete unreferenced chunks), `import-github` (M4).
+
+### Local layout
+- `catalog/catalog.json` (groups, mirrors, announcements, item order), `catalog/<id>/item.json` (metadata, media
+  paths relative to `catalog/<id>/media/`), `catalog/<id>/build.toml` (optional build spec). `catalog/` is
+  private-branch only (contains third-party art).
+- `out/stage/` mirrors the server root; `upload` sends it as one tar stream over ssh and clears it.
+- `out/<id>/<version>/manifest.json(.sig)` readable copies; `out/index.tsv` known chunks (refreshed from the
+  server on every online build).
+
+### Build spec (`catalog/<id>/build.toml`)
+```toml
+item = "gracidea"
+exe = "Pokemon - Gracidea Version.exe"
+keep = ["options.ini"]
+[[part]]
+zip = "PokemonGracidea.zip"        # relative to --input; extracted into `to` ("" = root)
+[[part]]
+files = ["items.ini", "moves.ini"]  # copied into `to`
+[[part]]
+zip = "maps.zip"
+to = "maps"
+# also: dir = "folder", strip_root = true (zips with one top folder)
+```
+Without a build spec, `--input` (folder or zip) is the install tree.
+
+### Measured (Gracidea, 2026-11-20)
+5708 files, 175.8 MB installed, 146.1 MB download in 71 chunks; build 20 s (zstd 19, all cores); upload 13 s on
+LAN. Changing one ini file -> 1 new chunk (641 KB).

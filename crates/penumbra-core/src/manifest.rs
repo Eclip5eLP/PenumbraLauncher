@@ -51,14 +51,33 @@ pub struct FileEntry {
     pub chunks: Vec<ChunkRef>,
 }
 
+/// One segment of a file: `size` bytes taken from chunk `hash` starting at `offset`.
+/// Big files use whole content-defined chunks (`offset` 0, `len` omitted = `size`). Small files are slices of a
+/// shared pack chunk (ADR-016), where `len` is the pack's full uncompressed length.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChunkRef {
     /// BLAKE3 of the uncompressed chunk, lowercase hex.
     pub hash: String,
-    /// Uncompressed size.
+    /// Bytes of this segment.
     pub size: u64,
-    /// Compressed (zstd) size on the server.
+    /// Compressed (zstd) size of the whole chunk on the server.
     pub csize: u64,
+    /// Start of this segment inside the uncompressed chunk.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub offset: u64,
+    /// Uncompressed length of the whole chunk, when it differs from `size` (pack chunks).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub len: Option<u64>,
+}
+
+fn is_zero(v: &u64) -> bool {
+    *v == 0
+}
+
+impl ChunkRef {
+    pub fn chunk_len(&self) -> u64 {
+        self.len.unwrap_or(self.size)
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -71,6 +90,8 @@ pub enum ManifestError {
     Duplicate(String),
     #[error("chunk sizes of {0} don't add up to the file size")]
     ChunkSizes(String),
+    #[error("bad chunk reference in {0}")]
+    BadChunk(String),
 }
 
 impl Manifest {
@@ -88,6 +109,11 @@ impl Manifest {
             if f.chunks.iter().map(|c| c.size).sum::<u64>() != f.size {
                 return Err(ManifestError::ChunkSizes(f.path.clone()));
             }
+            for c in &f.chunks {
+                if !crate::chunk::is_valid_hash(&c.hash) || c.offset + c.size > c.chunk_len() || c.chunk_len() > 64 << 20 {
+                    return Err(ManifestError::BadChunk(f.path.clone()));
+                }
+            }
         }
         for d in &self.dirs {
             validate_rel_path(d)?;
@@ -104,13 +130,24 @@ mod tests {
     use super::*;
 
     fn file(path: &str, size: u64) -> FileEntry {
+        let h = "ab".repeat(32);
         FileEntry {
             path: path.into(),
             size,
-            hash: "00".into(),
+            hash: h.clone(),
             exec: false,
-            chunks: vec![ChunkRef { hash: "00".into(), size, csize: size }],
+            chunks: vec![ChunkRef { hash: h, size, csize: size, offset: 0, len: None }],
         }
+    }
+
+    #[test]
+    fn pack_slices_must_fit_their_chunk() {
+        let mut f = file("a", 10);
+        f.chunks[0].offset = 5;
+        f.chunks[0].len = Some(12);
+        assert!(manifest(vec![f.clone()]).validate().is_err());
+        f.chunks[0].len = Some(15);
+        manifest(vec![f]).validate().unwrap();
     }
 
     fn manifest(files: Vec<FileEntry>) -> Manifest {

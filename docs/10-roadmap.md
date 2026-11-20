@@ -19,11 +19,17 @@ Each milestone ends with a working, committed state. Check boxes as work lands.
 - [x] Performance baseline measured and recorded in worklog
 
 ## M2 — Content pipeline + server
-- [ ] `penumbra-core`: manifest types, path validation, FastCDC + BLAKE3 + zstd, sign/verify, tests
-- [ ] `penumbra-pack build/upload/promote/list/verify`
-- [ ] `server/penumbra`: .htaccess (cache headers, deny data/), `catalog.php`, `manifest.php`, `_lib.php`
-- [ ] `tools/deploy-server.ps1`; deploy; Cloudflare caching of chunks verified (cf-cache-status: HIT)
-- [ ] First real items published: Pokemon Gracidea (multi-part build), Asperia (coming-soon placeholder); a dev-only link item for testing
+- [x] `penumbra-core`: manifest types (+ pack slices), path validation, BLAKE3 + zstd chunk codec, ed25519 sign/verify,
+      canonical JSON, tests
+- [x] `penumbra-pack keygen/build/promote/catalog/upload/list/verify/deploy-server/install-test` (FastCDC + small-file
+      packs, parallel zstd, immutable versions)
+- [x] `server/penumbra`: .htaccess (cache headers, deny catalog/ + data/), `catalog.php` (ETag, access filter, token
+      check via userbase), `manifest.php` (gating-ready), `_lib.php`, landing page
+- [x] Deployed; Cloudflare caching of chunks + media verified (cf-cache-status: HIT)
+- [x] Published: Pokemon Gracidea 0.3.14+1.5.1+1.2.51 (stable), Asperia (coming soon), PG Bot (GitHub, unresolved)
+- [x] End-to-end install test via public URL: signatures valid, all 5708 file hashes match
+- [ ] Confirm Gracidea runs from the assembled layout (user test of out/install-test)
+- [ ] Gated content staging into data/content (with M5), `gc`, dev-only link item (with M3 link support)
 
 ## M3 — Install & launch
 - [ ] Real catalog fetch + cache + per-item signature check; media cache

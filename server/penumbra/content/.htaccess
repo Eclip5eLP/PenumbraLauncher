@@ -1,0 +1,11 @@
+# Public version manifests (+ detached signatures). Versions are immutable by policy; short TTL as a safety net.
+<IfModule mod_headers.c>
+  Header set Cache-Control "public, max-age=300"
+</IfModule>
+<IfModule mod_mime.c>
+  AddType application/zstd .zst
+  AddType text/plain .sig
+</IfModule>
+<FilesMatch "\.php$">
+  Require all denied
+</FilesMatch>
