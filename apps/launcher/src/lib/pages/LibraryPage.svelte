@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from "../store.svelte";
+  import { api } from "../api";
   import { t, tDyn } from "../i18n";
 
   let filter = $state<"all" | "installed">("all");
@@ -44,12 +45,29 @@
         </div>
       </button>
     {:else}
-      <p class="muted">{t("library.empty")}</p>
+      <div class="empty">
+        {#if app.catalog.items.length === 0 && app.catalogStatus.state === "loading"}
+          <p class="muted">{t("library.loading")}</p>
+        {:else if app.catalog.items.length === 0 && app.catalogStatus.state === "offline"}
+          <p class="muted">{t("library.offline")}</p>
+        {:else if app.catalog.items.length === 0 && app.catalogStatus.state === "error"}
+          <p class="muted">{app.catalogStatus.message}</p>
+          <button class="btn" onclick={() => app.run(api.refreshCatalog())}>{t("library.retry")}</button>
+        {:else}
+          <p class="muted">{t("library.empty")}</p>
+        {/if}
+      </div>
     {/each}
   </div>
 </div>
 
 <style>
+  .empty {
+    grid-column: 1 / -1;
+    display: grid;
+    justify-items: start;
+    gap: 12px;
+  }
   .head {
     display: flex;
     align-items: baseline;

@@ -7,7 +7,8 @@
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as B64;
-use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, Signer, Verifier};
+pub use ed25519_dalek::{SigningKey, VerifyingKey};
 use serde_json::Value;
 
 #[derive(Debug, thiserror::Error)]

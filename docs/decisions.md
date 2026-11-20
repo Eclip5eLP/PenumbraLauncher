@@ -71,3 +71,14 @@ change it). The server stores `items.jsonl` and only filters lines by access rul
 
 **ADR-018 (2026-11-20) Published versions are immutable.** Cloudflare edge-caches manifests for hours (its browser
 TTL overrides our 5 min), so a version string is never reused; `build` checks the server and refuses.
+
+**ADR-019 (2026-11-21) Staging + journal instead of in-place writes.** Files are assembled in
+`.penumbra/staging` and only renamed into place after every staged file hashes correctly, so a paused, crashed or
+failed update never leaves a half-updated game. `journal.txt` (first line = target version) lists finished chunks;
+resuming re-plans deterministically and skips them. Costs temporary disk space = size of changed files.
+
+**ADR-020 (2026-11-21) native-tls (SChannel) for HTTPS.** reqwest 0.13's default rustls backend uses aws-lc-rs,
+which can need extra build tools on Windows; SChannel needs none and uses the Windows certificate store.
+
+**ADR-021 (2026-11-21) Media via the WebView HTTP cache.** Media URLs are content-hashed and immutable, so WebView2's
+own disk cache keeps them; no custom media cache yet. Revisit if art must show on a cold, offline start.

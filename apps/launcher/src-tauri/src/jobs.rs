@@ -1,31 +1,44 @@
-//! Download job queue. M1: a **simulated** downloader that exercises the real UI contract (queue, pause, resume,
-//! cancel, throttled progress events). The real engine (docs/05-launcher-app.md#download-engine-details)
-//! replaces `tick()` in M3; the public surface stays.
+//! Download queue (docs/05-launcher-app.md#job-state-machine). Runs engine jobs, turns their counters into
+//! throttled `jobs:changed` events (<= 10 Hz) and remembers unfinished jobs across restarts (`jobs.json`).
 
+use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
+use crate::engine::{self, Kind, Progress};
 use crate::error::{AppError, AppResult};
-use crate::state::{AppState, Installed};
+use crate::library::{Installed, now_unix};
+use crate::paths;
+use crate::state::AppState;
 
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)] // Repair is created by verify & repair (M3)
 pub enum JobKind {
     Install,
     Update,
     Repair,
 }
 
+impl JobKind {
+    fn engine(self) -> Kind {
+        match self {
+            JobKind::Install => Kind::Install,
+            JobKind::Update => Kind::Update,
+            JobKind::Repair => Kind::Repair,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-#[allow(dead_code)] // Error is produced by the real downloader (M3)
 pub enum JobState {
     Queued,
     Preparing,
+    Verifying,
     Downloading,
     Paused,
     Finalizing,
@@ -35,9 +48,6 @@ pub enum JobState {
 }
 
 impl JobState {
-    pub fn is_active(self) -> bool {
-        matches!(self, JobState::Preparing | JobState::Downloading | JobState::Finalizing)
-    }
     pub fn is_finished(self) -> bool {
         matches!(self, JobState::Done | JobState::Error | JobState::Cancelled)
     }
@@ -60,17 +70,33 @@ pub struct JobView {
     /// Seconds remaining.
     pub eta: Option<u64>,
     pub error: Option<String>,
-    /// Unix seconds when finished.
+    pub note: Option<String>,
     pub finished_at: Option<u64>,
+}
+
+/// What survives a restart.
+#[derive(Serialize, Deserialize)]
+struct Saved {
+    item: String,
+    kind: JobKind,
+    channel: String,
+    version: String,
+    path: String,
+    paused: bool,
+}
+
+struct Entry {
+    view: JobView,
+    progress: Arc<Progress>,
+    handle: Option<tauri::async_runtime::JoinHandle<()>>,
+    last_done: u64,
 }
 
 #[derive(Default)]
 struct Inner {
     next_id: u64,
-    jobs: Vec<JobView>,
-    /// Ticks spent in the current preparing/finalizing phase.
-    phase_ticks: std::collections::HashMap<u64, u32>,
-    t: u64,
+    entries: Vec<Entry>,
+    dirty: bool,
 }
 
 #[derive(Default, Clone)]
@@ -78,24 +104,26 @@ pub struct JobManager {
     inner: Arc<Mutex<Inner>>,
 }
 
-const TICK: Duration = Duration::from_millis(100);
-
-fn now_unix() -> u64 {
-    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+fn saved_file() -> PathBuf {
+    paths::config_dir().join("jobs.json")
 }
 
 impl JobManager {
     pub fn list(&self) -> Vec<JobView> {
-        self.inner.lock().unwrap().jobs.clone()
+        self.inner.lock().unwrap().entries.iter().map(|e| e.view.clone()).collect()
     }
 
-    pub fn enqueue(&self, item: &str, kind: JobKind, channel: &str, version: &str, path: &str, total: u64) -> AppResult<JobView> {
+    pub fn has_active_job(&self, item: &str) -> bool {
+        self.inner.lock().unwrap().entries.iter().any(|e| e.view.item == item && !e.view.state.is_finished())
+    }
+
+    pub fn enqueue(&self, item: &str, kind: JobKind, channel: &str, version: &str, path: &str) -> AppResult<JobView> {
         let mut g = self.inner.lock().unwrap();
-        if g.jobs.iter().any(|j| j.item == item && !j.state.is_finished()) {
+        if g.entries.iter().any(|e| e.view.item == item && !e.view.state.is_finished()) {
             return Err(AppError::InvalidState(format!("{item} already has a download")));
         }
         g.next_id += 1;
-        let job = JobView {
+        let view = JobView {
             id: g.next_id,
             item: item.into(),
             kind,
@@ -104,177 +132,271 @@ impl JobManager {
             path: path.into(),
             state: JobState::Queued,
             downloaded: 0,
-            total,
+            total: 0,
             speed: 0,
             eta: None,
             error: None,
+            note: None,
             finished_at: None,
         };
-        g.jobs.push(job.clone());
-        Ok(job)
+        g.entries.push(Entry { view: view.clone(), progress: Arc::default(), handle: None, last_done: 0 });
+        g.dirty = true;
+        drop(g);
+        self.persist();
+        Ok(view)
     }
 
-    pub fn set_paused(&self, id: u64, paused: bool) -> AppResult<()> {
+    fn with_entry<T>(&self, id: u64, f: impl FnOnce(&mut Entry) -> AppResult<T>) -> AppResult<T> {
         let mut g = self.inner.lock().unwrap();
-        let j = g.jobs.iter_mut().find(|j| j.id == id).ok_or(AppError::UnknownJob(id))?;
-        match (paused, j.state) {
-            (true, JobState::Queued | JobState::Preparing | JobState::Downloading) => {
-                j.state = JobState::Paused;
-                j.speed = 0;
-                j.eta = None;
+        let e = g.entries.iter_mut().find(|e| e.view.id == id).ok_or(AppError::UnknownJob(id))?;
+        let r = f(e)?;
+        g.dirty = true;
+        drop(g);
+        self.persist();
+        Ok(r)
+    }
+
+    pub fn pause(&self, id: u64) -> AppResult<()> {
+        self.with_entry(id, |e| {
+            if e.view.state.is_finished() || e.view.state == JobState::Paused {
+                return Err(AppError::InvalidState("can't pause this job".into()));
             }
-            (false, JobState::Paused) => j.state = JobState::Queued,
-            _ => return Err(AppError::InvalidState(format!("can't {} job in state {:?}", if paused { "pause" } else { "resume" }, j.state))),
-        }
-        Ok(())
+            if e.view.state == JobState::Finalizing {
+                return Err(AppError::InvalidState("almost done, can't pause now".into()));
+            }
+            e.progress.stop.store(true, Ordering::Relaxed);
+            if let Some(h) = e.handle.take() {
+                h.abort(); // staging + journal stay: resume continues
+            }
+            e.view.state = JobState::Paused;
+            e.view.speed = 0;
+            e.view.eta = None;
+            Ok(())
+        })
+    }
+
+    pub fn resume(&self, id: u64) -> AppResult<()> {
+        self.with_entry(id, |e| {
+            if e.view.state != JobState::Paused {
+                return Err(AppError::InvalidState("job isn't paused".into()));
+            }
+            e.view.state = JobState::Queued;
+            e.view.error = None;
+            Ok(())
+        })
     }
 
     pub fn cancel(&self, id: u64) -> AppResult<()> {
-        let mut g = self.inner.lock().unwrap();
-        let j = g.jobs.iter_mut().find(|j| j.id == id).ok_or(AppError::UnknownJob(id))?;
-        if j.state.is_finished() || j.state == JobState::Finalizing {
-            return Err(AppError::InvalidState("job can't be cancelled now".into()));
-        }
-        j.state = JobState::Cancelled;
-        j.speed = 0;
-        j.eta = None;
-        j.finished_at = Some(now_unix());
+        let (path, fresh) = self.with_entry(id, |e| {
+            if e.view.state.is_finished() || e.view.state == JobState::Finalizing {
+                return Err(AppError::InvalidState("job can't be cancelled now".into()));
+            }
+            e.progress.stop.store(true, Ordering::Relaxed);
+            if let Some(h) = e.handle.take() {
+                h.abort();
+            }
+            e.view.state = JobState::Cancelled;
+            e.view.speed = 0;
+            e.view.eta = None;
+            e.view.finished_at = Some(now_unix());
+            Ok((PathBuf::from(&e.view.path), e.view.kind == JobKind::Install))
+        })?;
+        // Clean up off the UI thread (discard waits for in-flight writes to let go of their files).
+        std::thread::spawn(move || engine::discard(&path, fresh));
         Ok(())
     }
 
-    /// Moves a queued/paused job to the front of the queue.
+    /// Retries a failed job (keeps what was already downloaded).
+    pub fn retry(&self, id: u64) -> AppResult<()> {
+        self.with_entry(id, |e| {
+            if e.view.state != JobState::Error {
+                return Err(AppError::InvalidState("job hasn't failed".into()));
+            }
+            e.view.state = JobState::Queued;
+            e.view.error = None;
+            e.view.finished_at = None;
+            Ok(())
+        })
+    }
+
     pub fn prioritize(&self, id: u64) -> AppResult<()> {
         let mut g = self.inner.lock().unwrap();
-        let pos = g.jobs.iter().position(|j| j.id == id).ok_or(AppError::UnknownJob(id))?;
-        let job = g.jobs.remove(pos);
-        g.jobs.insert(0, job);
+        let pos = g.entries.iter().position(|e| e.view.id == id).ok_or(AppError::UnknownJob(id))?;
+        let e = g.entries.remove(pos);
+        g.entries.insert(0, e);
+        g.dirty = true;
         Ok(())
     }
 
     pub fn clear_finished(&self) {
-        self.inner.lock().unwrap().jobs.retain(|j| !j.state.is_finished());
+        let mut g = self.inner.lock().unwrap();
+        g.entries.retain(|e| !e.view.state.is_finished());
+        g.dirty = true;
     }
 
-    /// Starts the background loop. Emits `jobs:changed` (full list) at most every 100 ms, only on change.
+    fn persist(&self) {
+        let saved: Vec<Saved> = self
+            .inner
+            .lock()
+            .unwrap()
+            .entries
+            .iter()
+            .filter(|e| !e.view.state.is_finished())
+            .map(|e| Saved {
+                item: e.view.item.clone(),
+                kind: e.view.kind,
+                channel: e.view.channel.clone(),
+                version: e.view.version.clone(),
+                path: e.view.path.clone(),
+                paused: e.view.state == JobState::Paused,
+            })
+            .collect();
+        if let Ok(json) = serde_json::to_vec_pretty(&saved) {
+            let _ = paths::write_atomic(&saved_file(), &json);
+        }
+    }
+
+    /// Restores unfinished jobs from the last session.
+    pub fn restore(&self, resume: bool) {
+        let Ok(bytes) = std::fs::read(saved_file()) else { return };
+        let Ok(saved) = serde_json::from_slice::<Vec<Saved>>(&bytes) else { return };
+        for s in saved {
+            if let Ok(v) = self.enqueue(&s.item, s.kind, &s.channel, &s.version, &s.path)
+                && (s.paused || !resume)
+            {
+                let _ = self.with_entry(v.id, |e| {
+                    e.view.state = JobState::Paused;
+                    Ok(())
+                });
+            }
+        }
+    }
+
     pub fn start(&self, app: AppHandle) {
         let this = self.clone();
         tauri::async_runtime::spawn(async move {
-            let mut iv = tokio::time::interval(TICK);
+            let mut iv = tokio::time::interval(Duration::from_millis(100));
             iv.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             loop {
                 iv.tick().await;
-                let (changed, finished) = this.tick(&app);
-                if changed {
+                if this.tick(&app) {
                     let _ = app.emit("jobs:changed", this.list());
-                }
-                for job in finished {
-                    on_finished(&app, &job);
                 }
             }
         });
     }
 
-    /// One simulation step. Returns (anything changed, jobs that just completed).
-    fn tick(&self, app: &AppHandle) -> (bool, Vec<JobView>) {
-        let state = app.state::<AppState>();
-        let (max_jobs, limit_kbs, pause_running) = {
-            let s = state.settings.lock().unwrap();
-            (s.max_concurrent_jobs as usize, s.bandwidth_limit as u64, s.pause_while_running)
-        };
-        let game_running = pause_running && !state.running.lock().unwrap().is_empty();
-
+    /// Starts queued jobs when there's capacity and refreshes progress. Returns true when the UI must update.
+    fn tick(&self, app: &AppHandle) -> bool {
+        let max = app.state::<AppState>().settings.lock().unwrap().max_concurrent_jobs.max(1) as usize;
         let mut g = self.inner.lock().unwrap();
-        g.t += 1;
-        let t = g.t;
-        let mut changed = false;
-        let mut finished = vec![];
-
-        // Promote queued jobs while there's capacity (queue order = list order).
-        let mut active = g.jobs.iter().filter(|j| j.state.is_active()).count();
-        for j in g.jobs.iter_mut() {
-            if active >= max_jobs {
-                break;
-            }
-            if j.state == JobState::Queued {
-                j.state = JobState::Preparing;
+        let mut changed = std::mem::take(&mut g.dirty);
+        let mut active = g.entries.iter().filter(|e| e.handle.is_some()).count();
+        for e in g.entries.iter_mut() {
+            if active < max && e.view.state == JobState::Queued {
                 active += 1;
                 changed = true;
+                e.view.state = JobState::Preparing;
+                e.progress = Arc::default();
+                e.last_done = 0;
+                let spec = engine::Spec {
+                    item: e.view.item.clone(),
+                    kind: e.view.kind.engine(),
+                    channel: e.view.channel.clone(),
+                    version: e.view.version.clone(),
+                    path: PathBuf::from(&e.view.path),
+                };
+                let (app2, prog, id, this) = (app.clone(), e.progress.clone(), e.view.id, self.clone());
+                e.handle = Some(tauri::async_runtime::spawn(async move {
+                    let r = engine::run(app2.clone(), spec, prog).await;
+                    this.finish(&app2, id, r);
+                }));
+            }
+            if e.handle.is_some() {
+                let p = &e.progress;
+                let state = match p.phase.load(Ordering::Relaxed) {
+                    engine::PHASE_VERIFYING => JobState::Verifying,
+                    engine::PHASE_DOWNLOADING => JobState::Downloading,
+                    engine::PHASE_FINALIZING => JobState::Finalizing,
+                    _ => JobState::Preparing,
+                };
+                let done = p.done.load(Ordering::Relaxed);
+                let total = p.total.load(Ordering::Relaxed);
+                let inst = done.saturating_sub(e.last_done) * 10;
+                e.last_done = done;
+                let speed = if state == JobState::Downloading || state == JobState::Verifying {
+                    if e.view.speed == 0 { inst } else { (e.view.speed * 8 + inst * 2) / 10 }
+                } else {
+                    0
+                };
+                let eta = (speed > 0).then(|| total.saturating_sub(done) / speed.max(1));
+                if state != e.view.state || done != e.view.downloaded || total != e.view.total || speed != e.view.speed {
+                    changed = true;
+                }
+                e.view.state = state;
+                e.view.downloaded = done;
+                e.view.total = total;
+                e.view.speed = speed;
+                e.view.eta = eta;
             }
         }
+        changed
+    }
 
-        let Inner { jobs, phase_ticks, .. } = &mut *g;
-        for j in jobs.iter_mut() {
-            match j.state {
-                JobState::Preparing => {
-                    let n = phase_ticks.entry(j.id).or_default();
-                    *n += 1;
-                    if *n >= 6 {
-                        phase_ticks.remove(&j.id);
-                        j.state = JobState::Downloading;
-                    }
-                    changed = true;
+    fn finish(&self, app: &AppHandle, id: u64, result: Result<engine::Outcome, String>) {
+        let state = app.state::<AppState>();
+        let mut installed = None;
+        {
+            let mut g = self.inner.lock().unwrap();
+            let Some(e) = g.entries.iter_mut().find(|e| e.view.id == id) else { return };
+            e.handle = None;
+            e.view.speed = 0;
+            e.view.eta = None;
+            e.view.finished_at = Some(now_unix());
+            match result {
+                Ok(o) => {
+                    e.view.state = JobState::Done;
+                    e.view.note = o.note;
+                    e.view.downloaded = e.view.total;
+                    installed = Some((e.view.item.clone(), e.view.version.clone(), e.view.channel.clone(), e.view.path.clone(), o.size));
+                    tracing::info!(item = %e.view.item, version = %e.view.version, written = o.written, "job done");
                 }
-                JobState::Downloading => {
-                    // Simulated link: ~55 MB/s with a gentle wobble, capped by the bandwidth limit.
-                    let wobble = 0.85 + 0.15 * ((t as f64) / 7.0).sin();
-                    let mut bps = (55_000_000.0 * wobble) as u64;
-                    if limit_kbs > 0 {
-                        bps = bps.min(limit_kbs * 1024);
-                    }
-                    if game_running {
-                        bps = 0;
-                    }
-                    let step = bps / 10;
-                    j.downloaded = (j.downloaded + step).min(j.total);
-                    j.speed = if j.speed == 0 { bps } else { (j.speed * 7 + bps * 3) / 10 };
-                    j.eta = (j.speed > 0).then(|| (j.total - j.downloaded) / j.speed.max(1));
-                    if j.downloaded >= j.total {
-                        j.state = JobState::Finalizing;
-                        j.speed = 0;
-                        j.eta = None;
-                    }
-                    changed = true;
+                Err(err) => {
+                    tracing::error!(item = %e.view.item, "job failed: {err}");
+                    e.view.state = JobState::Error;
+                    e.view.error = Some(err);
                 }
-                JobState::Finalizing => {
-                    let n = phase_ticks.entry(j.id).or_default();
-                    *n += 1;
-                    if *n >= 8 {
-                        phase_ticks.remove(&j.id);
-                        j.state = JobState::Done;
-                        j.finished_at = Some(now_unix());
-                        finished.push(j.clone());
-                    }
-                    changed = true;
-                }
-                _ => {}
             }
+            g.dirty = true;
         }
-        (changed, finished)
+        self.persist();
+        if let Some((item, version, channel, path, size)) = installed {
+            let lib = state.update_library(|lib| {
+                let prev = lib.get(&item).cloned();
+                lib.insert(
+                    item.clone(),
+                    Installed {
+                        version,
+                        channel,
+                        path: path.clone(),
+                        size,
+                        playtime_sec: prev.as_ref().map(|p| p.playtime_sec).unwrap_or(0),
+                        last_played: prev.and_then(|p| p.last_played),
+                    },
+                );
+            });
+            // Remember the library folder for the next install.
+            if let Some(parent) = PathBuf::from(&path).parent().map(|p| p.to_string_lossy().to_string()) {
+                let mut s = state.settings.lock().unwrap();
+                if !s.libraries.contains(&parent) {
+                    s.libraries.push(parent.clone());
+                }
+                if s.default_library.is_none() {
+                    s.default_library = Some(parent);
+                }
+                let _ = s.save();
+            }
+            let _ = app.emit("library:changed", lib);
+        }
     }
-}
-
-fn on_finished(app: &AppHandle, job: &JobView) {
-    let state = app.state::<AppState>();
-    let size = state
-        .item(&job.item)
-        .and_then(|i| i.channels.get(&job.channel))
-        .and_then(|c| c.size)
-        .unwrap_or(job.total);
-    {
-        let mut lib = state.library.lock().unwrap();
-        let prev = lib.get(&job.item).cloned();
-        lib.insert(
-            job.item.clone(),
-            Installed {
-                version: job.version.clone(),
-                channel: job.channel.clone(),
-                path: job.path.clone(),
-                size,
-                playtime_sec: prev.as_ref().map(|p| p.playtime_sec).unwrap_or(0),
-                last_played: prev.and_then(|p| p.last_played),
-            },
-        );
-    }
-    tracing::info!(item = %job.item, version = %job.version, "job finished (simulated)");
-    let _ = app.emit("library:changed", state.library.lock().unwrap().clone());
 }

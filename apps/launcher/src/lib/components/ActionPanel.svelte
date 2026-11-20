@@ -41,6 +41,7 @@
     play: Play,
     queued: Pause,
     downloading: Pause,
+    verifying: Pause,
     paused: Play,
   };
   const spinning: Action[] = ["preparing", "finalizing"];
@@ -51,6 +52,7 @@
       case "play":
         return t(item.type === "software" ? "action.launch" : "action.play");
       case "downloading":
+      case "verifying":
       case "queued":
         return t("action.pause");
       case "paused":
@@ -84,9 +86,18 @@
     const e: (MenuEntry | "sep")[] = [];
     if (installed) {
       e.push(
-        { label: t("item.menu.openFolder"), icon: FolderOpen, disabled: true, hint: "M3" },
-        { label: t("item.menu.verify"), icon: ShieldCheck, disabled: true, hint: "M3" },
-        { label: t("item.menu.move"), icon: HardDrive, disabled: true, hint: "M3" },
+        {
+          label: t("item.menu.openFolder"),
+          icon: FolderOpen,
+          onclick: () => app.run(api.openFolder(item.id)),
+        },
+        {
+          label: t("item.menu.verify"),
+          icon: ShieldCheck,
+          disabled: !!job || app.running.includes(item.id),
+          onclick: () => app.run(api.verify(item.id)),
+        },
+        { label: t("item.menu.move"), icon: HardDrive, disabled: true, hint: t("item.menu.moveLater") },
       );
     }
     const links = Object.keys(item.links);

@@ -2,7 +2,7 @@
 // never deep-proxied, so 10 Hz progress updates stay cheap.
 import { api, errorMessage, on } from "./api";
 import { setLanguage, t } from "./i18n";
-import type { Bootstrap, Catalog, Item, Job, Library, Settings } from "./types";
+import type { Bootstrap, Catalog, CatalogStatus, Item, Job, Library, Settings } from "./types";
 
 export type Route =
   | { page: "item"; id: string }
@@ -29,6 +29,7 @@ export type Action =
   | "running"
   | "queued"
   | "preparing"
+  | "verifying"
   | "downloading"
   | "paused"
   | "finalizing";
@@ -59,6 +60,8 @@ class AppStore {
   library = $state.raw<Library>({});
   jobs = $state.raw<Job[]>([]);
   running = $state.raw<string[]>([]);
+  catalogStatus = $state.raw<CatalogStatus>({ state: "loading" });
+  suggestedLibrary = "";
   route = $state<Route>({ page: "library" });
   channelPref = $state<Record<string, string>>({});
   dialog = $state<Dialog | null>(null);
@@ -73,8 +76,15 @@ class AppStore {
     this.library = b.library;
     this.jobs = b.jobs;
     this.running = b.running;
+    this.catalogStatus = b.catalogStatus;
+    this.suggestedLibrary = b.suggestedLibrary;
     setLanguage(b.settings.language);
     this.applyMotion();
+    this.pickStartRoute();
+  }
+
+  /** Last viewed item if it still exists, else the first item, else the library. */
+  private pickStartRoute() {
     const last = readLocal(LAST_ITEM_KEY);
     const first = this.visibleItems[0]?.id;
     const id = last && this.item(last) ? last : first;
@@ -86,14 +96,31 @@ class AppStore {
       on("jobs:changed", (jobs) => {
         for (const j of jobs) {
           const prev = this.jobs.find((p) => p.id === j.id);
-          if (prev && prev.state !== "done" && j.state === "done") {
-            const name = this.item(j.item)?.name ?? j.item;
-            this.toast("ok", t(j.kind === "update" ? "toast.updated" : "toast.installed", { name }));
+          if (!prev || prev.state === j.state) continue;
+          const name = this.item(j.item)?.name ?? j.item;
+          if (j.state === "done") {
+            const key =
+              j.kind === "repair"
+                ? "toast.repaired"
+                : j.kind === "update"
+                  ? "toast.updated"
+                  : "toast.installed";
+            this.toast("ok", j.note ? `${name}: ${j.note}` : t(key, { name }), 5000);
+          } else if (j.state === "error") {
+            this.toast("err", `${name}: ${j.error ?? t("toast.error")}`, 8000);
           }
         }
         this.jobs = jobs;
       }),
       on("library:changed", (lib) => (this.library = lib)),
+      on("catalog:changed", (c) => {
+        const wasEmpty = this.catalog.items.length === 0;
+        this.catalog = c;
+        const r = this.route;
+        if ((r.page === "item" && !this.item(r.id)) || (wasEmpty && r.page === "library"))
+          this.pickStartRoute();
+      }),
+      on("catalog:status", (s) => (this.catalogStatus = s)),
       on("settings:changed", (s) => {
         this.settings = s;
         setLanguage(s.language);
@@ -181,6 +208,7 @@ class AppStore {
         return this.run(api.launch(item.id));
       case "downloading":
       case "preparing":
+      case "verifying":
       case "queued":
         return job && this.run(api.pauseJob(job.id));
       case "paused":

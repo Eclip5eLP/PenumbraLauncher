@@ -2,7 +2,7 @@
 // Outside Tauri (plain browser during UI development) calls go to a dev-only mock backend.
 import { invoke as tauriInvoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { AppError, Bootstrap, Job, Library, Settings } from "./types";
+import type { AppError, Bootstrap, Catalog, CatalogStatus, Job, Library, Settings } from "./types";
 
 export const inTauri = isTauri();
 
@@ -17,6 +17,13 @@ export const api = {
   bootstrap: () => invoke<Bootstrap>("get_bootstrap"),
   appReady: (firstPaintMs: number) => invoke<number>("app_ready", { firstPaintMs }),
   setSettings: (patch: Partial<Settings>) => invoke<Settings>("set_settings", { patch }),
+  refreshCatalog: () => invoke<void>("refresh_catalog"),
+  verify: (item: string) => invoke<Job>("verify", { item }),
+  retryJob: (id: number) => invoke<void>("retry_job", { id }),
+  locateInstall: (item: string, path: string) => invoke<void>("locate_install", { item, path }),
+  pickFolder: (start?: string) => invoke<string | null>("pick_folder", { start }),
+  diskSpace: (path: string) => invoke<number | null>("disk_space", { path }),
+  openFolder: (item: string) => invoke<void>("open_folder", { item }),
   install: (item: string, channel: string, path?: string) => invoke<Job>("install", { item, channel, path }),
   pauseJob: (id: number) => invoke<void>("pause_job", { id }),
   resumeJob: (id: number) => invoke<void>("resume_job", { id }),
@@ -30,6 +37,8 @@ export const api = {
 
 export interface Events {
   "jobs:changed": Job[];
+  "catalog:changed": Catalog;
+  "catalog:status": CatalogStatus;
   "library:changed": Library;
   "settings:changed": Settings;
   "process:changed": { item: string; running: boolean };

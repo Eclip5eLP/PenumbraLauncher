@@ -1,7 +1,7 @@
 // Dev-only stand-in for the Rust backend when the UI runs in a normal browser (`npm run dev`, no Tauri).
 // Lets the UI be developed and screenshotted in any browser. Never bundled into the app: api.ts imports it
 // dynamically only when `isTauri()` is false.
-import catalog from "../../src-tauri/mock/catalog.json";
+import catalog from "./dev/mock-catalog.json";
 import type { Bootstrap, Catalog, Job, Library, Settings } from "./types";
 
 type Listener = (payload: unknown) => void;
@@ -117,6 +117,8 @@ export const mockInvoke = async (cmd: string, args: Record<string, unknown> = {}
         library,
         jobs,
         running,
+        catalogStatus: { state: "ok" },
+        suggestedLibrary: "D:\Penumbra Games",
         mock: true,
       } satisfies Bootstrap;
     case "app_ready":
@@ -178,6 +180,17 @@ export const mockInvoke = async (cmd: string, args: Record<string, unknown> = {}
       }, 8000);
       return;
     }
+    case "refresh_catalog":
+    case "open_folder":
+    case "locate_install":
+      return;
+    case "pick_folder":
+      return null;
+    case "disk_space":
+      return 512e9;
+    case "verify":
+    case "retry_job":
+      return fail("mock: not simulated in the browser");
     case "open_item_link":
       return;
   }

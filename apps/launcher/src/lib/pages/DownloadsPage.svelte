@@ -13,7 +13,7 @@
   const finishedStates = ["done", "error", "cancelled"];
   const active = $derived(app.jobs.filter((j) => !finishedStates.includes(j.state)));
   const current = $derived(
-    active.filter((j) => ["preparing", "downloading", "finalizing"].includes(j.state)),
+    active.filter((j) => ["preparing", "verifying", "downloading", "finalizing"].includes(j.state)),
   );
   const queue = $derived(active.filter((j) => !current.includes(j)));
   const done = $derived(app.jobs.filter((j) => finishedStates.includes(j.state)).reverse());
@@ -73,7 +73,7 @@
         <div class="row stats">
           <span>{Math.floor(pct)}% · {t("downloads.of", { a: bytes(j.downloaded), b: bytes(j.total) })}</span>
           <span>
-            {#if j.state === "downloading"}
+            {#if j.state === "downloading" || j.state === "verifying"}
               {speed(j.speed)}{#if j.eta != null}
                 · {t("downloads.eta", { t: duration(j.eta) })}{/if}
             {:else}
@@ -156,6 +156,14 @@
               {tDyn(`downloads.kinds.${j.kind}`)} · {j.version} · {bytes(j.total)}
             </div>
           </div>
+          {#if j.state === "error"}
+            <span class="err-msg" title={j.error ?? ""}>{j.error}</span>
+            <button class="btn small" onclick={() => app.run(api.retryJob(j.id))}>
+              {t("downloads.retry")}
+            </button>
+          {:else if j.note}
+            <span class="muted small">{j.note}</span>
+          {/if}
           <span class="result {j.state}">
             {#if j.state === "done"}<CircleCheck size={15} />{/if}
             {tDyn(`downloads.states.${j.state}`)}
@@ -277,6 +285,14 @@
   }
   .title-s {
     font-weight: 600;
+  }
+  .err-msg {
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #f08a8a;
+    font-size: 0.86em;
   }
   .result {
     display: flex;

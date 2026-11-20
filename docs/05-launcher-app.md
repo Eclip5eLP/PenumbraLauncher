@@ -6,6 +6,18 @@
   Rust backend (dev builds only, never bundled). Good for UI work and screenshots.
 - `npm run check` (svelte-check), `cargo test --workspace`, `cargo clippy --workspace`.
 - Release binary without installer: `npx tauri build --no-bundle` -> `target/release/penumbra-launcher.exe`.
+- End-to-end testing of the real app: start it with
+  `$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=9222"; npm run tauri dev`, then
+  `node tools/dev/cdp.mjs invoke <command> '<json>'`, `... eval "<js>"`, `... shot out/shots/x.png`.
+  Use forward slashes in paths passed through Git Bash (backslashes get eaten).
+
+## Implemented engine (M3) — where things are
+- `catalog.rs` cached catalog -> `catalog:changed` / `catalog:status`; items failing signature checks are dropped.
+- `engine.rs` one job: manifest (CDN `content/` first, `api/v1/manifest.php` fallback for gated items) ->
+  survey (sizes, or full BLAKE3 for repair) -> `penumbra_core::plan` -> local copies -> parallel chunk fetch ->
+  staging `.penumbra/staging/<hash(path)>.part` + `.penumbra/journal.txt` -> finalize (hash all, rename, delete).
+- `jobs.rs` queue, 10 Hz progress, `jobs.json` persistence; pause/cancel set `Progress.stop` + abort the task.
+- `process.rs` Job Object tracking; `sys.rs` free space + default library; `library.rs` library.json + records.
 
 ## Rust backend modules (`apps/launcher/src-tauri/src/`)
 | Module | Responsibility |

@@ -32,12 +32,15 @@ Each milestone ends with a working, committed state. Check boxes as work lands.
 - [ ] Gated content staging into data/content (with M5), `gc`, dev-only link item (with M3 link support)
 
 ## M3 — Install & launch
-- [ ] Real catalog fetch + cache + per-item signature check; media cache
-- [ ] JobManager, downloader, apply, journal/resume, pause/cancel, queue
-- [ ] Install dialog (path, space check), library.json, rediscover installs
-- [ ] Launch + process tracking + playtime; link items open browser; installer items
-- [ ] Verify & repair, uninstall, move, open folder
-- [ ] Error handling + toasts + logs
+- [x] Real catalog fetch (ETag) + disk cache + per-item signature check; media via WebView HTTP cache (immutable URLs)
+- [x] JobManager, parallel downloader (connections setting, retries, bandwidth limit, pause while playing), staging,
+      journal resume (also across restarts via jobs.json), pause/cancel/retry, queue
+- [x] Install dialog (library folder picker, free space), library.json, `.penumbra/install.json` (+ `locate_install`)
+- [x] Launch + Job Object tracking + playtime; link items open browser
+- [x] Verify & repair (full hash, re-downloads only broken data), uninstall (manifest files only), open folder
+- [x] Error handling: toasts, failed jobs with Retry, logs
+- [x] E2E via CDP (tools/dev/cdp.mjs): install 146 MB in ~12 s, repair, launch/playtime, pause -> restart -> resume, cancel
+- [ ] Move install, `installer` items, mirror failover, custom media cache for fully offline art (later)
 
 ## M4 — Updates
 - [ ] Delta plan incl. local chunk reuse + `keep` rules; tests with synthetic versions

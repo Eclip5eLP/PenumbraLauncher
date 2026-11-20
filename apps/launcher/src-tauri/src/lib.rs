@@ -1,11 +1,17 @@
 //! Penumbra Launcher backend. Architecture: docs/02-architecture.md, docs/05-launcher-app.md.
 
+mod catalog;
 mod commands;
+mod engine;
 mod error;
 mod jobs;
+mod library;
+mod net;
 mod paths;
+mod process;
 mod settings;
 mod state;
+mod sys;
 
 use std::time::{Duration, Instant};
 
@@ -66,10 +72,14 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(AppState::new(started, settings))
         .setup(|app| {
             let handle = app.handle().clone();
-            app.state::<AppState>().jobs.start(handle.clone());
+            let state = app.state::<AppState>();
+            let resume = state.settings.lock().unwrap().resume_on_start;
+            state.jobs.restore(resume);
+            state.jobs.start(handle.clone());
             // Safety net: never leave an invisible app if the UI fails to report its first paint.
             tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(Duration::from_secs(3)).await;
@@ -85,13 +95,20 @@ pub fn run() {
             commands::get_bootstrap,
             commands::app_ready,
             commands::set_settings,
+            commands::refresh_catalog,
             commands::install,
+            commands::verify,
             commands::pause_job,
             commands::resume_job,
             commands::cancel_job,
+            commands::retry_job,
             commands::prioritize_job,
             commands::clear_finished_jobs,
             commands::uninstall,
+            commands::locate_install,
+            commands::pick_folder,
+            commands::disk_space,
+            commands::open_folder,
             commands::launch,
             commands::open_item_link,
         ])

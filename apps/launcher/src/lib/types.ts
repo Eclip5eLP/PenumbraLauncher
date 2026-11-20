@@ -87,7 +87,15 @@ export type Library = Record<string, Installed>;
 
 export type JobKind = "install" | "update" | "repair";
 export type JobState =
-  "queued" | "preparing" | "downloading" | "paused" | "finalizing" | "done" | "error" | "cancelled";
+  | "queued"
+  | "preparing"
+  | "verifying"
+  | "downloading"
+  | "paused"
+  | "finalizing"
+  | "done"
+  | "error"
+  | "cancelled";
 
 export interface Job {
   id: number;
@@ -102,6 +110,7 @@ export interface Job {
   speed: number;
   eta?: number | null;
   error?: string | null;
+  note?: string | null;
   finishedAt?: number | null;
 }
 
@@ -143,6 +152,11 @@ export interface Settings {
   devMode: boolean;
 }
 
+export interface CatalogStatus {
+  state: "loading" | "ok" | "offline" | "error";
+  message?: string | null;
+}
+
 export interface Bootstrap {
   appVersion: string;
   settings: Settings;
@@ -150,6 +164,8 @@ export interface Bootstrap {
   library: Library;
   jobs: Job[];
   running: string[];
+  catalogStatus: CatalogStatus;
+  suggestedLibrary: string;
   mock: boolean;
 }
 

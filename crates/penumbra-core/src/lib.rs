@@ -8,4 +8,5 @@ pub mod catalog;
 pub mod chunk;
 pub mod manifest;
 pub mod paths;
+pub mod plan;
 pub mod sign;
