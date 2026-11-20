@@ -1,0 +1,72 @@
+{
+  "format": 1,
+  "generated": "2026-11-20T20:00:00Z",
+  "mirrors": ["https://eclip5e.com/penumbra/"],
+  "announcements": [],
+  "groups": [
+    { "id": "games", "name": "Games" },
+    { "id": "software", "name": "Software" },
+    { "id": "links", "name": "Web" }
+  ],
+  "items": [
+    {
+      "id": "gracidea",
+      "type": "game",
+      "group": "games",
+      "name": "Pokemon Gracidea",
+      "tagline": "A fan-made adventure through the Gracidea region.",
+      "description": "Explore the Gracidea region, catch new forms and battle your way through eight gyms.",
+      "media": {
+        "icon": "/mock/gracidea-icon.webp",
+        "bg": "/mock/gracidea-bg.webp",
+        "cover": "/mock/gracidea-cover.webp",
+        "accent": "#e0607e"
+      },
+      "access": "public",
+      "source": { "kind": "penumbra" },
+      "channels": { "stable": { "version": "0.3.14+1.5.1+1.2.51", "size": 168000000, "download": 154000000 } },
+      "banners": [
+        { "id": "b1", "image": "/mock/gracidea-banner1.webp", "title": "Version 0.3.14 is out" },
+        { "id": "b2", "image": "/mock/gracidea-banner2.webp", "title": "New region maps" },
+        { "id": "b3", "image": "/mock/gracidea-banner3.webp", "title": "Forest of Gracidea" }
+      ],
+      "news": [
+        { "id": "n1", "category": "notice", "title": "Gracidea is now available in Penumbra Launcher", "date": "2026-11-20" },
+        { "id": "n2", "category": "info", "title": "Patch notes 0.3.14: battle fixes and new sprites", "date": "2026-11-13" },
+        { "id": "n3", "category": "event", "title": "Shaymin mystery gift event", "date": "2026-11-01" },
+        { "id": "n4", "category": "info", "title": "Data update 1.2.51: encounter tables", "date": "2026-10-28" }
+      ],
+      "links": { "website": "https://eclip5e.com/development/Gracidea/" }
+    },
+    {
+      "id": "asperia",
+      "type": "game",
+      "group": "games",
+      "name": "Asperia Chronicles",
+      "tagline": "An RPG in the making.",
+      "status": "coming-soon",
+      "media": { "icon": "/mock/asperia-icon.webp", "bg": "/mock/asperia-bg.webp", "cover": "/mock/asperia-cover.webp", "accent": "#9b6cf6" },
+      "access": "public",
+      "source": { "kind": "penumbra" },
+      "channels": {},
+      "news": [{ "id": "a1", "category": "notice", "title": "Asperia Chronicles is coming to Penumbra Launcher", "date": "2026-11-20" }]
+    },
+    {
+      "id": "pgbot",
+      "type": "software",
+      "group": "software",
+      "name": "Pirate Galaxy AFK Bot",
+      "tagline": "AFK farming bot for Pirate Galaxy.",
+      "description": "Use at your own risk: Pirate Galaxy's Code of Conduct forbids software that automates play.",
+      "media": { "icon": "/mock/pgbot-icon.webp", "bg": "/mock/pgbot-bg.webp", "cover": "/mock/pgbot-cover.webp", "accent": "#4aa3df" },
+      "access": "public",
+      "source": { "kind": "github", "repo": "Eclip5eLP/Pirate-Galaxy-AFK-Bot", "stripRoot": true },
+      "channels": {
+        "stable": { "version": "v1.0.0", "size": 42000000, "download": 18000000, "mode": "release" },
+        "dev": { "version": "main@3f2a9c1", "size": 1200000, "download": 400000, "mode": "branch" }
+      },
+      "news": [{ "id": "p1", "category": "info", "title": "Releases are now published on GitHub", "date": "2026-11-20" }],
+      "links": { "github": "https://github.com/Eclip5eLP/Pirate-Galaxy-AFK-Bot" }
+    }
+  ]
+}

@@ -6,15 +6,17 @@ Each milestone ends with a working, committed state. Check boxes as work lands.
 - [x] Plan + docs, git repo
 - [x] Public `main` / private `dev` branches + `tools/sync-public.ps1`
 - [x] GitHub remotes (public + private repos) pushed
-- [ ] Cargo workspace, `penumbra-core` + `penumbra-pack` skeletons
-- [ ] Tauri 2 + Svelte 5 + TS scaffold in `apps/launcher`, release profile, lint/format (rustfmt, clippy, prettier, svelte-check)
-- [ ] Generate signing keys (manifest ed25519, updater minisign) into `C:\Eclip5eDev\keys\`
+- [x] Cargo workspace, `penumbra-core` (catalog/manifest types, path rules + tests) + `penumbra-pack` CLI skeleton
+- [x] Tauri 2 + Svelte 5 + TS scaffold in `apps/launcher`, release profile, svelte-check, prettier
+- [x] Updater signing key (minisign) in `C:\Eclip5eDev\keys\`; manifest ed25519 key comes with `penumbra-pack keygen` (M2)
 
 ## M1 — UI shell (mock data)
-- [ ] Frameless window, title bar, rail, item page, action button states, settings page skeleton, downloads page skeleton
-- [ ] Design tokens, Inter font, icons, transitions, i18n scaffolding (en)
-- [ ] `get_bootstrap` with mock catalog; window shown on first paint; startup timer logged
-- [ ] Performance baseline measured and recorded in worklog
+- [x] Frameless window, title bar, rail, item page (background crossfade, news carousel, action panel), library grid,
+      downloads page, settings page (persisted), install/uninstall dialogs, toasts
+- [x] Design tokens, Inter font, Lucide icons, transitions, reduced motion, i18n scaffolding (en)
+- [x] `get_bootstrap` with mock catalog; window shown on first paint; startup timer logged
+- [x] Simulated job queue in Rust (pause/resume/cancel/prioritize, 10 Hz events) + browser dev mock
+- [x] Performance baseline measured and recorded in worklog
 
 ## M2 — Content pipeline + server
 - [ ] `penumbra-core`: manifest types, path validation, FastCDC + BLAKE3 + zstd, sign/verify, tests

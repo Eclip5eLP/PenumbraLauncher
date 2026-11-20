@@ -8,8 +8,9 @@
 
 ## Updater
 - `tauri-plugin-updater`, endpoints `https://eclip5e.com/penumbra/launcher/latest.json` (beta: `latest-beta.json`).
-- Updates are signed with the Tauri updater key (minisign). Private key: `C:\Eclip5eDev\keys\updater.key`
-  (+ password) — never in git. Public key in `tauri.conf.json`.
+- Updates are signed with the Tauri updater key (minisign). Private key: `C:\Eclip5eDev\keys\updater.key`,
+  password in `updater.key.password` next to it — never in git. Public key committed as
+  `apps/launcher/src-tauri/updater.key.pub` (goes into `tauri.conf.json` -> `plugins.updater.pubkey` in M6).
 - Behaviour: check at start (after first paint, 10 s delay) and every 6 h; download in background; show
   "Restart to update" pill in the title bar; applied on restart, or automatically on next start if
   `autoUpdateLauncher`. Never interrupt running downloads: the pill waits; restart pauses jobs (they resume).

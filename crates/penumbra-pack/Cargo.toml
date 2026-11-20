@@ -1,0 +1,12 @@
+[package]
+name = "penumbra-pack"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Publisher CLI: builds chunked, signed item versions and uploads them to the Penumbra server."
+
+[dependencies]
+penumbra-core.workspace = true
+clap.workspace = true
+anyhow.workspace = true

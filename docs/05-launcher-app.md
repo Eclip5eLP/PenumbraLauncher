@@ -1,5 +1,12 @@
 # 05 — Launcher app (Tauri)
 
+## Development
+- `npm run tauri dev` (in `apps/launcher`): real app, Rust + Vite HMR.
+- `npm run dev`: UI only in any browser at http://localhost:1420 — `src/lib/browser-mock.ts` stands in for the
+  Rust backend (dev builds only, never bundled). Good for UI work and screenshots.
+- `npm run check` (svelte-check), `cargo test --workspace`, `cargo clippy --workspace`.
+- Release binary without installer: `npx tauri build --no-bundle` -> `target/release/penumbra-launcher.exe`.
+
 ## Rust backend modules (`apps/launcher/src-tauri/src/`)
 | Module | Responsibility |
 |--------|----------------|

@@ -1,0 +1,240 @@
+/* Design tokens (docs/06-ui-design.md). Dark only for now. */
+:root {
+  --bg: #111114;
+  --bg-2: #16161a;
+  --panel: #1d1e22;
+  --panel-2: #25272c;
+  --panel-3: #2d2f35;
+  --line: #2e3036;
+  --line-2: #3a3d44;
+  --text: #e8e8ea;
+  --text-2: #c4c5ca;
+  --muted: #9a9ca3;
+  --faint: #6c6e75;
+  --accent: #5385c1;
+  --accent-2: color-mix(in oklab, var(--accent) 70%, white);
+  --accent-ink: #fff;
+  --brand-1: #7b5cf0;
+  --brand-2: #e04fa0;
+  --ok: #3a9a63;
+  --err: #c24848;
+  --warn: #c28a2e;
+
+  --glass: rgb(16 16 20 / 0.58);
+  --glass-line: rgb(255 255 255 / 0.08);
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --shadow: 0 10px 30px rgb(0 0 0 / 0.45);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --fast: 120ms;
+  --med: 200ms;
+  --rail-w: 72px;
+  --title-h: 40px;
+  --ui-scale: 1;
+
+  --font: "Inter Variable", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+[data-reduce-motion] {
+  --fast: 0ms;
+  --med: 0ms;
+}
+[data-reduce-motion] *,
+[data-reduce-motion] *::before,
+[data-reduce-motion] *::after {
+  animation-duration: 0ms !important;
+  transition-duration: 0ms !important;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: calc(14px * var(--ui-scale));
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}
+
+#app {
+  height: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+img {
+  display: block;
+  -webkit-user-drag: none;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--panel-3);
+  border-radius: 10px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---- shared building blocks ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-weight: 550;
+  transition:
+    background var(--fast),
+    transform var(--fast) var(--ease),
+    border-color var(--fast);
+}
+.btn:hover:not(:disabled) {
+  background: var(--panel-3);
+  border-color: var(--line-2);
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.btn:disabled {
+  opacity: 0.5;
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-ink);
+}
+.btn.primary:hover:not(:disabled) {
+  background: var(--accent-2);
+}
+.btn.danger {
+  background: var(--err);
+  border-color: transparent;
+  color: #fff;
+}
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+.btn.ghost:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.06);
+}
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  transition:
+    background var(--fast),
+    color var(--fast);
+}
+.icon-btn:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.08);
+  color: var(--text);
+}
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+}
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 0.86em;
+}
+.page {
+  height: 100%;
+  overflow-y: auto;
+  padding: 28px 36px 40px;
+}
+.page h1 {
+  font-size: 1.6em;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin-bottom: 20px;
+}
+.bar {
+  height: 6px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.1);
+  overflow: hidden;
+}
+.bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  border-radius: inherit;
+  transition: width 120ms linear;
+}
+.bar.paused > span {
+  background: var(--faint);
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin {
+  animation: spin 1s linear infinite;
+}

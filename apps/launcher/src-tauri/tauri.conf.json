@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Penumbra Launcher",
+  "version": "0.1.0",
+  "identifier": "com.eclip5e.penumbra.launcher",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Penumbra Launcher",
+        "width": 1280,
+        "height": 760,
+        "minWidth": 1024,
+        "minHeight": 640,
+        "center": true,
+        "decorations": false,
+        "visible": false,
+        "backgroundColor": "#131313"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost https://eclip5e.com data:; media-src 'self' asset: http://asset.localhost https://eclip5e.com; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "windows": {
+      "nsis": { "installMode": "currentUser" },
+      "webviewInstallMode": { "type": "embedBootstrapper" }
+    }
+  }
+}
