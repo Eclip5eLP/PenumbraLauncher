@@ -12,9 +12,12 @@ Current distribution (server `www/development/Gracidea/`), driven by its own old
 Plan: the publisher assembles all three parts into **one install tree** and publishes it as one item version
 (chunk dedup means a data-only update downloads only the changed data files). Launcher version string:
 `<exe>+<sprites>+<data>` e.g. `0.3.14+1.5.1+1.2.51`, or a single version the user picks.
-`keep`: `options.ini`, save folder (TBD). Launch `Pokemon - Gracidea Version.exe`.
-Open: exact target folders for data.zip / maps.zip / ini files (what GracideaLauncher does) — see open questions.
-Media: background candidates exist in `Gracidea/launcher/data/*.jpg` (fan art — check usage rights before using).
+`keep`: `options.ini`. Saves live in the game's own `%APPDATA%` folder, so updates/uninstall never touch them
+(cloud saves can target that folder later). Install folder can be anywhere (user confirmed).
+Assumption: all parts are extracted into the install root (exe zip at root, data.zip contents at root, `.ini` files
+and maps.zip contents at root) — verify by launching the assembled build in M2; adjust `build.toml` if the game
+expects subfolders.
+Media: backgrounds from `Gracidea/launcher/data/*.jpg` (user confirmed OK to use).
 
 ## Asperia Chronicles — `asperia` (game, source `penumbra`, unreleased)
 - Server folder `www/development/asperia/` currently only has the analytics dashboard + `old_data/` config files.
@@ -25,8 +28,9 @@ Media: background candidates exist in `Gracidea/launcher/data/*.jpg` (fan art �
   `dev` so it can be tested through the launcher before release.
 
 ## Pirate Galaxy AFK Bot — `pgbot` (software, source `github`, access public)
-See [11-sources-github.md](11-sources-github.md#initial-github-item-pirate-galaxy-afk-bot).
+See [11-sources-github.md](11-sources-github.md#initial-github-item-pirate-galaxy-afk-bot). The user adds GitHub releases
+themselves; `stable` = latest release.
 Group: Software. Show the README's "use at your own risk" note in the item description.
 
-## Links (for testing the `link` type)
-To pick with the user later; candidates: PG Database (`https://pg.eclip5e.com/`), eclip5e.com.
+## Links
+None for now (user). The `link` type is still built and tested with a dev-only catalog entry.

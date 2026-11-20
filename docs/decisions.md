@@ -50,3 +50,10 @@ via `tools/sync-public.ps1`. `main` never shares history with `dev`, so private 
 commits. Alt: two-way merges (private files leak via history), git subtree/filter-repo (heavy, error-prone).
 
 **ADR-013 (2026-11-20) English only, i18n-ready.** All strings through the i18n layer from M1; German/Japanese later.
+
+**ADR-014 (2026-11-20) GitHub mode per channel.** A GitHub item's channels each choose `release` (latest release
+asset or source zip), `branch` (latest pushed commit) or `tag`. Reuses the existing channel switcher instead of a
+separate setting, and lets one item offer stable releases and bleeding-edge builds side by side.
+
+**ADR-015 (2026-11-20) No license file.** User chose GitHub's default (no license = all rights reserved; the public
+repo is source-available, not open source). Revisit if contributions or reuse are wanted.
