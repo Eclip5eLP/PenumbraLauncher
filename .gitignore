@@ -1,0 +1,29 @@
+# Rust
+/target/
+**/target/
+
+# Node
+node_modules/
+dist/
+.svelte-kit/
+*.tsbuildinfo
+
+# Tauri
+apps/launcher/src-tauri/gen/schemas/
+
+# Publisher output (content is published to the server, not committed)
+/out/
+
+# Secrets — keys live in C:\Eclip5eDev\keys, never here
+*.key
+*.pem
+.env
+.env.*
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.log

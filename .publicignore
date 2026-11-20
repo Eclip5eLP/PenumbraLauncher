@@ -1,0 +1,6 @@
+# Paths that exist only on the private `dev` branch and are stripped by tools/sync-public.ps1
+# when building the public `main` branch. One git pathspec per line.
+CLAUDE.md
+docs/private
+tools/private
+.claude
