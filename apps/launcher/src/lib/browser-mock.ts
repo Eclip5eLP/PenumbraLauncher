@@ -44,6 +44,7 @@ const settings: Settings = {
   offlineMode: false,
   cacheLimitMb: 1024,
   devMode: true,
+  updatedAt: 0,
 };
 const cat = catalog as unknown as Catalog;
 for (const i of cat.items) {
@@ -120,6 +121,7 @@ export const mockInvoke = async (cmd: string, args: Record<string, unknown> = {}
         catalogStatus: { state: "ok" },
         auth: { signedIn: false },
         updater: { state: "idle" },
+        playtimeOther: {},
         suggestedLibrary: "D:\Penumbra Games",
         mock: true,
       } satisfies Bootstrap;

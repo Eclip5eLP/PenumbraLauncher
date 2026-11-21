@@ -71,9 +71,13 @@ Each milestone ends with a working, committed state. Check boxes as work lands.
 - [ ] `penumbra://` deep links (moved to M8), code signing certificate (open question)
 
 ## M7 — Cloud
-- [ ] Settings sync
-- [ ] Cloud saves (userbase data store), conflict dialog, local save backups
-- [ ] Playtime sync
+- [x] Settings sync (account data store key `settings`, newest `updatedAt` wins, 5 s debounced push)
+- [x] Cloud saves on our server (`api/v1/saves.php`, 5 snapshots, 50 MB, 409 on conflicting uploads), pull
+      before launch, push after exit, conflict dialog, local backups (5); Gracidea save paths declared
+- [x] Playtime sync (per device, summed in the UI)
+- [x] E2E with the `pltest` fake game (in out/e2e, never the real Gracidea saves): first upload, fresh-PC
+      restore, conflict -> cloud (backup checked), conflict -> keep local (forced upload), relaunch after choice,
+      settings pulled on restart. Found + fixed: dialog lost its `item` prop after closing.
 
 ## M8 — Polish
 - [ ] News carousel + posts (news.json per item), announcements

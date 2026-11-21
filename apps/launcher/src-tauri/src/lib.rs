@@ -3,6 +3,7 @@
 mod archive;
 mod auth;
 mod catalog;
+mod cloudsave;
 mod commands;
 mod cred;
 mod engine;
@@ -15,6 +16,7 @@ mod paths;
 mod process;
 mod settings;
 mod state;
+mod sync;
 mod sys;
 mod updater;
 
@@ -134,6 +136,7 @@ pub fn run() {
             commands::disk_space,
             commands::open_folder,
             commands::launch,
+            commands::resolve_saves,
             commands::open_item_link,
         ])
         .run(tauri::generate_context!())

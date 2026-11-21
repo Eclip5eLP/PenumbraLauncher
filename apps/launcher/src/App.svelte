@@ -6,6 +6,7 @@
   import InstallDialog from "./lib/components/InstallDialog.svelte";
   import UninstallDialog from "./lib/components/UninstallDialog.svelte";
   import SignInDialog from "./lib/components/SignInDialog.svelte";
+  import SaveConflictDialog from "./lib/components/SaveConflictDialog.svelte";
   import ItemPage from "./lib/pages/ItemPage.svelte";
   import LibraryPage from "./lib/pages/LibraryPage.svelte";
   import DownloadsPage from "./lib/pages/DownloadsPage.svelte";
@@ -36,6 +37,8 @@
   <UninstallDialog id={app.dialog.item} />
 {:else if app.dialog?.kind === "signin"}
   <SignInDialog />
+{:else if app.dialog?.kind === "saveConflict"}
+  <SaveConflictDialog item={app.dialog.item} cloud={app.dialog.cloud} />
 {/if}
 <Toasts />
 

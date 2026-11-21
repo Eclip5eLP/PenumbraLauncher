@@ -94,6 +94,9 @@ pub struct Item {
     /// Things that must be on the PC (checked before launch), e.g. Python.
     #[serde(default)]
     pub requires: Vec<Requirement>,
+    /// Where the game keeps its saves, for cloud saves.
+    #[serde(default)]
+    pub cloud_saves: Option<CloudSaves>,
     /// Detached ed25519 signature over the canonical item JSON (without this field).
     #[serde(default)]
     pub sig: Option<String>,
@@ -194,6 +197,16 @@ pub struct Channel {
     /// Publish date (RFC 3339) of the resolved version.
     #[serde(default)]
     pub date: Option<String>,
+}
+
+/// Save locations: `<ROOT>/<glob>` with ROOT one of `%APPDATA%`, `%LOCALAPPDATA%`, `%USERPROFILE%`,
+/// `%DOCUMENTS%`, `{install}`, e.g. `%LOCALAPPDATA%/Pokemon___Gracidea_Version/save*.ini`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloudSaves {
+    pub paths: Vec<String>,
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

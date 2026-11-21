@@ -27,6 +27,8 @@ pub struct AppState {
     pub http: reqwest::Client,
     pub auth: crate::auth::Auth,
     pub updater: crate::updater::Updater,
+    /// Seconds played on other PCs, per item (from playtime sync).
+    pub playtime_other: Mutex<std::collections::BTreeMap<String, u64>>,
     pub limiter: Limiter,
 }
 
@@ -51,6 +53,7 @@ impl AppState {
             },
             limiter: Limiter::default(),
             updater: crate::updater::Updater::default(),
+            playtime_other: Mutex::new(Default::default()),
         }
     }
 

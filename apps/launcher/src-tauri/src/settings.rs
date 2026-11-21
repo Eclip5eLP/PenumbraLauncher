@@ -61,6 +61,8 @@ pub struct Settings {
     pub offline_mode: bool,
     pub cache_limit_mb: u32,
     pub dev_mode: bool,
+    /// Unix time of the last change to a synced setting (newest wins in settings sync).
+    pub updated_at: u64,
 }
 
 impl Default for Settings {
@@ -101,6 +103,7 @@ impl Default for Settings {
             offline_mode: false,
             cache_limit_mb: 1024,
             dev_mode: cfg!(debug_assertions),
+            updated_at: 0,
         }
     }
 }

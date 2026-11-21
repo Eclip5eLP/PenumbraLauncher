@@ -103,3 +103,11 @@ removes only its own files) and avoids a data migration; revisit if the uninstal
 **ADR-026 (2026-11-21) Updates install only on a click.** Downloads happen in the background, but replacing the
 launcher waits for "Restart to update" (or the next manual install), so a running game or download is never
 interrupted by surprise.
+
+**ADR-027 (2026-11-21) Cloud saves on our own server.** The userbase data store would need its quota raised in the
+admin page and still caps values at 8 MB; `saves.php` gives 50 MB snapshots with history and conflict detection
+using the same bearer tokens. Settings and playtime (tiny) stay in the userbase data store.
+
+**ADR-028 (2026-11-21) Local data in the app-identifier folder.** `%LOCALAPPDATA%\com.eclip5e.penumbra.launcher`
+(cache, logs, save backups; WebView2 data was already there) so it never mixes with the program folder
+`%LOCALAPPDATA%\Penumbra Launcher` that the installer uses. Supersedes ADR-025.

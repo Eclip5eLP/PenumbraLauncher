@@ -7,6 +7,7 @@ import type {
   Bootstrap,
   Catalog,
   CatalogStatus,
+  CloudMeta,
   Item,
   Job,
   Library,
@@ -21,7 +22,10 @@ export type Route =
   | { page: "settings"; section?: string };
 
 export type Dialog =
-  { kind: "install"; item: string } | { kind: "uninstall"; item: string } | { kind: "signin" };
+  | { kind: "install"; item: string }
+  | { kind: "uninstall"; item: string }
+  | { kind: "signin" }
+  | { kind: "saveConflict"; item: string; cloud: CloudMeta };
 
 export interface Toast {
   id: number;
@@ -75,6 +79,7 @@ class AppStore {
   suggestedLibrary = "";
   auth = $state.raw<AuthState>({ signedIn: false });
   updater = $state.raw<UpdaterState>({ state: "idle" });
+  playtimeOther = $state.raw<Record<string, number>>({});
   route = $state<Route>({ page: "library" });
   channelPref = $state<Record<string, string>>({});
   dialog = $state<Dialog | null>(null);
@@ -93,6 +98,7 @@ class AppStore {
     this.suggestedLibrary = b.suggestedLibrary;
     this.auth = b.auth;
     this.updater = b.updater;
+    this.playtimeOther = b.playtimeOther ?? {};
     setLanguage(b.settings.language);
     this.applyMotion();
     this.pickStartRoute();
@@ -137,6 +143,8 @@ class AppStore {
       }),
       on("catalog:status", (s) => (this.catalogStatus = s)),
       on("updater:state", (u) => (this.updater = u)),
+      on("notice", (n) => this.toast(n.kind, n.text, n.kind === "err" ? 8000 : 4000)),
+      on("playtime:changed", (p) => (this.playtimeOther = p)),
       on("auth:changed", (a) => {
         const was = this.auth.signedIn;
         this.auth = a;
@@ -231,7 +239,7 @@ class AppStore {
       case "update":
         return this.run(api.install(item.id, this.channelOf(item)));
       case "play":
-        return this.run(api.launch(item.id));
+        return this.play(item.id);
       case "downloading":
       case "preparing":
       case "verifying":
@@ -243,6 +251,28 @@ class AppStore {
       case "paused":
         return job && this.run(api.resumeJob(job.id));
     }
+  }
+
+  /** Launch; a cloud-save conflict opens the "which saves?" dialog instead of an error toast. */
+  async play(id: string) {
+    try {
+      await api.launch(id);
+    } catch (e) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === "save_conflict") {
+        let cloud: CloudMeta = { rev: 0, size: 0, hash: "", device: "", updated: "" };
+        try {
+          cloud = JSON.parse(err.message ?? "{}");
+        } catch {
+          /* keep defaults */
+        }
+        this.dialog = { kind: "saveConflict", item: id, cloud };
+      } else this.toast("err", errorMessage(e));
+    }
+  }
+
+  playtime(id: string): number {
+    return (this.library[id]?.playtimeSec ?? 0) + (this.playtimeOther[id] ?? 0);
   }
 
   async setSetting<K extends keyof Settings>(key: K, value: Settings[K]) {

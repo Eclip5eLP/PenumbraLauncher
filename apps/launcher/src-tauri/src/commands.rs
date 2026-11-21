@@ -32,6 +32,7 @@ pub struct Bootstrap {
     suggested_library: String,
     auth: crate::auth::AuthState,
     updater: crate::updater::UpdaterState,
+    playtime_other: std::collections::BTreeMap<String, u64>,
     mock: bool,
 }
 
@@ -54,6 +55,7 @@ pub fn get_bootstrap(app: AppHandle, state: State<'_, AppState>) -> Bootstrap {
         suggested_library: suggested,
         auth: state.auth.state(),
         updater: state.updater.view.lock().unwrap().clone(),
+        playtime_other: state.playtime_other.lock().unwrap().clone(),
         mock: false,
     }
 }
@@ -65,6 +67,7 @@ pub fn app_ready(app: AppHandle, state: State<'_, AppState>, first_paint_ms: f64
     show_main(&app, &state)?;
     tracing::info!(startup_ms = ms, webview_first_paint_ms = first_paint_ms, "window shown");
     tauri::async_runtime::spawn(crate::catalog::refresh(app.clone()));
+    tauri::async_runtime::spawn(crate::sync::pull_all(app.clone()));
     Ok(ms)
 }
 
@@ -86,14 +89,21 @@ pub async fn refresh_catalog(app: AppHandle) {
 
 #[tauri::command]
 pub fn set_settings(app: AppHandle, state: State<'_, AppState>, patch: Value) -> AppResult<Settings> {
+    let synced = patch.as_object().is_some_and(|o| o.keys().any(|k| crate::sync::SYNC_KEYS.contains(&k.as_str())));
     let next = {
         let mut s = state.settings.lock().unwrap();
-        let next = s.patched(&patch)?;
+        let mut next = s.patched(&patch)?;
+        if synced {
+            next.updated_at = now_unix();
+        }
         next.save()?;
         *s = next.clone();
         next
     };
     let _ = app.emit("settings:changed", &next);
+    if synced {
+        crate::sync::schedule_push(&app);
+    }
     Ok(next)
 }
 
@@ -302,8 +312,50 @@ struct ProcessEvent {
     running: bool,
 }
 
+#[derive(Serialize, Clone)]
+pub struct Notice {
+    pub kind: &'static str,
+    pub text: String,
+}
+
+pub fn notify(app: &AppHandle, kind: &'static str, text: impl Into<String>) {
+    let _ = app.emit("notice", Notice { kind, text: text.into() });
+}
+
+/// Starts a game. With cloud saves: newer cloud saves are pulled first (a conflict returns `save_conflict` and the
+/// UI asks which saves to keep); after the game closes, changed saves and playtime are uploaded.
 #[tauri::command]
-pub fn launch(app: AppHandle, state: State<'_, AppState>, item: String) -> AppResult<()> {
+pub async fn launch(app: AppHandle, item: String) -> AppResult<()> {
+    let state = app.state::<AppState>();
+    if let Some(it) = state.item(&item) {
+        match crate::cloudsave::before_launch(&app, &it).await {
+            Ok(crate::cloudsave::Before::Conflict { cloud }) => {
+                return Err(AppError::SaveConflict(serde_json::to_string(&cloud).unwrap_or_default()));
+            }
+            Ok(crate::cloudsave::Before::Downloaded) => notify(&app, "ok", "Cloud saves downloaded."),
+            Ok(crate::cloudsave::Before::UpToDate) => {}
+            Err(e) => {
+                tracing::warn!(%item, "cloud saves check failed: {e}");
+                notify(&app, "info", "Couldn't check cloud saves; playing with the saves on this PC.");
+            }
+        }
+    }
+    launch_now(&app, &state, item)
+}
+
+/// Resolves a save conflict: `cloud` replaces this PC's saves (backed up first), `local` uploads them.
+#[tauri::command]
+pub async fn resolve_saves(app: AppHandle, item: String, keep: String) -> AppResult<()> {
+    let it = app.state::<AppState>().item(&item).ok_or_else(|| AppError::UnknownItem(item.clone()))?;
+    let r = match keep.as_str() {
+        "cloud" => crate::cloudsave::download_and_apply(&app, &it).await,
+        "local" => crate::cloudsave::after_exit(&app, &it, true).await.map(|_| ()),
+        _ => return Err(AppError::InvalidState("keep must be cloud or local".into())),
+    };
+    r.map_err(AppError::InvalidState)
+}
+
+fn launch_now(app: &AppHandle, state: &AppState, item: String) -> AppResult<()> {
     let inst = state.library.lock().unwrap().get(&item).cloned().ok_or_else(|| AppError::InvalidState("not installed".into()))?;
     if state.running.lock().unwrap().contains_key(&item) {
         return Err(AppError::InvalidState("already running".into()));
@@ -373,8 +425,19 @@ pub fn launch(app: AppHandle, state: State<'_, AppState>, item: String) -> AppRe
                 i.last_played = Some(now_unix());
             }
         });
-        let _ = app2.emit("process:changed", ProcessEvent { item, running: false });
+        let _ = app2.emit("process:changed", ProcessEvent { item: item.clone(), running: false });
         let _ = app2.emit("library:changed", lib);
+        // Cloud: upload changed saves, then this PC's playtime.
+        tauri::async_runtime::spawn(async move {
+            if let Some(it) = app2.state::<AppState>().item(&item) {
+                match crate::cloudsave::after_exit(&app2, &it, false).await {
+                    Ok(true) => notify(&app2, "ok", "Saves uploaded to the cloud."),
+                    Ok(false) => {}
+                    Err(e) => notify(&app2, "err", e),
+                }
+            }
+            crate::sync::push_playtime(app2, item).await;
+        });
     });
     Ok(())
 }

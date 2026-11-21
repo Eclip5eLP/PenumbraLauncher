@@ -13,9 +13,10 @@ pub fn config_dir() -> PathBuf {
     env_dir("APPDATA").join(APP_DIR)
 }
 
-/// Local, big or regenerable: cache, logs.
+/// Local, big or regenerable: cache, logs. Uses the app identifier folder (where WebView2 keeps its data too),
+/// NOT `%LOCALAPPDATA%\Penumbra Launcher`: that's the installer's default program folder (ADR-025).
 pub fn local_dir() -> PathBuf {
-    env_dir("LOCALAPPDATA").join(APP_DIR)
+    env_dir("LOCALAPPDATA").join("com.eclip5e.penumbra.launcher")
 }
 
 pub fn logs_dir() -> PathBuf {

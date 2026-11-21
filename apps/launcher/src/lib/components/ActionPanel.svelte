@@ -198,12 +198,12 @@
     {/if}
   </div>
   {#if action === "update" && installed && !ch?.required && !app.running.includes(item.id)}
-    <button class="anyway" onclick={() => app.run(api.launch(item.id))}>
+    <button class="anyway" onclick={() => app.play(item.id)}>
       {t("item.playAnyway", { v: installed.version })}
     </button>
   {/if}
-  {#if installed && installed.playtimeSec > 0}
-    <div class="foot">{t("item.playtime", { t: duration(installed.playtimeSec) })}</div>
+  {#if installed && app.playtime(item.id) > 0}
+    <div class="foot">{t("item.playtime", { t: duration(app.playtime(item.id)) })}</div>
   {/if}
 </div>
 

@@ -153,6 +153,7 @@ export interface Settings {
   offlineMode: boolean;
   cacheLimitMb: number;
   devMode: boolean;
+  updatedAt: number;
 }
 
 export interface User {
@@ -181,6 +182,14 @@ export interface UpdaterState {
   error?: string | null;
 }
 
+export interface CloudMeta {
+  rev: number;
+  size: number;
+  hash: string;
+  device: string;
+  updated: string;
+}
+
 export interface CatalogStatus {
   state: "loading" | "ok" | "offline" | "error";
   message?: string | null;
@@ -197,6 +206,7 @@ export interface Bootstrap {
   suggestedLibrary: string;
   auth: AuthState;
   updater: UpdaterState;
+  playtimeOther: Record<string, number>;
   mock: boolean;
 }
 

@@ -178,6 +178,14 @@ export const en = {
     guestInfo: "Sign in to download account-only content. Cloud saves and settings sync follow later.",
     signIn: "Sign in",
   },
+  saves: {
+    title: "Which saves do you want to keep?",
+    body: "Your saves on this PC and in the cloud both changed since they were last in sync.",
+    cloud: "Cloud saves from {device}, {date}",
+    keepCloud: "Use cloud saves",
+    keepLocal: "Keep this PC's saves",
+    backupNote: "The saves you don't keep are backed up on this PC (last 5).",
+  },
   updater: {
     restart: "Restart to update",
     available: "Update to {v}",

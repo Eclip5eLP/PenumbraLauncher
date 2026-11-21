@@ -51,6 +51,7 @@ export const api = {
   clearFinishedJobs: () => invoke<void>("clear_finished_jobs"),
   uninstall: (item: string) => invoke<void>("uninstall", { item }),
   launch: (item: string) => invoke<void>("launch", { item }),
+  resolveSaves: (item: string, keep: "cloud" | "local") => invoke<void>("resolve_saves", { item, keep }),
   openItemLink: (item: string, key?: string) => invoke<void>("open_item_link", { item, key }),
 };
 
@@ -61,6 +62,8 @@ export interface Events {
   "auth:changed": AuthState;
   "auth:device-failed": string;
   "updater:state": UpdaterState;
+  notice: { kind: "ok" | "err" | "info"; text: string };
+  "playtime:changed": Record<string, number>;
   "library:changed": Library;
   "settings:changed": Settings;
   "process:changed": { item: string; running: boolean };

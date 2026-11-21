@@ -12,6 +12,9 @@ pub enum AppError {
     InvalidState(String),
     #[error("invalid settings: {0}")]
     Settings(String),
+    /// Cloud and local saves both changed; the message is the cloud snapshot's metadata (JSON).
+    #[error("{0}")]
+    SaveConflict(String),
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
@@ -25,6 +28,7 @@ impl AppError {
             AppError::UnknownJob(_) => "unknown_job",
             AppError::InvalidState(_) => "invalid_state",
             AppError::Settings(_) => "invalid_settings",
+            AppError::SaveConflict(_) => "save_conflict",
             AppError::Io(_) => "io",
             AppError::Tauri(_) => "internal",
         }

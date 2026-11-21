@@ -102,6 +102,7 @@ impl Auth {
         *self.user.lock().unwrap() = user;
         if changed {
             let _ = app.emit("auth:changed", self.state());
+            tauri::async_runtime::spawn(crate::sync::pull_all(app.clone()));
             // Personalised catalog (restricted items appear/disappear).
             tauri::async_runtime::spawn(crate::catalog::refresh(app.clone()));
         }

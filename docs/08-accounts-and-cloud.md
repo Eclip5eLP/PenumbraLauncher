@@ -50,6 +50,19 @@ The user decided to keep the userbase as is (no loopback-redirect change), so de
   `updatedAt`. Pull on sign-in/start, push debounced 5 s after changes. Conflict: newer `updatedAt` wins
   (whole-document; fine for settings).
 
+## As implemented (M7)
+- Cloud saves are stored on our server, not in the userbase data store (its 64 KB/256 KB defaults are too small
+  and raising them needs the admin page): `api/v1/saves.php`, files in `data/saves/<user id>/<item>/`
+  (`meta.json` + `<rev>.zip`, newest 5 kept, 50 MB per snapshot). Upload names its base revision; another
+  device in between -> 409 -> the user is asked on the next launch.
+- Catalog field `cloudSaves: { paths, exclude }`, paths `<ROOT>/<glob>` with ROOT `%APPDATA%`, `%LOCALAPPDATA%`,
+  `%USERPROFILE%`, `%DOCUMENTS%` or `{install}`. Zip entries are `TOKEN/rel`, restore only writes entries that
+  match the item's own declared paths.
+- Launcher: `cloudsave.rs` (sync state `%APPDATA%\Penumbra Launcher\cloudsaves\<item>.json` = last synced rev +
+  fingerprint; backups `%LOCALAPPDATA%\com.eclip5e.penumbra.launcher\save-backups\<item>\`), `sync.rs`
+  (settings + playtime via userbase `api/data.php`). A failed check never blocks playing.
+- Gracidea: `%LOCALAPPDATA%/Pokemon___Gracidea_Version/{save,storage,dex}*.ini` (GameMaker save area).
+
 ## Cloud saves
 - Catalog declares save locations per item: `cloudSaves.paths` (globs with `%APPDATA%`, `%LOCALAPPDATA%`,
   `%USERPROFILE%`, `%DOCUMENTS%`, `{install}`) and `exclude`.
