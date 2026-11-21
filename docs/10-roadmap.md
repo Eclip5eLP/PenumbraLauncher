@@ -64,9 +64,11 @@ Each milestone ends with a working, committed state. Check boxes as work lands.
       restart -> silent refresh, sign-out (server revoke, credential + account.json removed, pltest hidden)
 
 ## M6 — Self-update & distribution
-- [ ] NSIS config, updater plugin, `release.ps1`, `latest.json`
-- [ ] Landing page `eclip5e.com/penumbra/` with download button
-- [ ] End-to-end update test (v0.1.0 → v0.1.1)
+- [x] NSIS config, updater plugin, `tools/release.ps1`, `latest.json` (+ `latest-beta.json`)
+- [x] Landing page `eclip5e.com/penumbra/` with download button (version, size, date, SmartScreen note)
+- [x] End-to-end update test: public 0.1.0 installer -> installed -> found 0.1.1 -> background download ->
+      "Restart to update" -> passive installer -> relaunched as 0.1.1 (release startup 369-458 ms)
+- [ ] `penumbra://` deep links (moved to M8), code signing certificate (open question)
 
 ## M7 — Cloud
 - [ ] Settings sync

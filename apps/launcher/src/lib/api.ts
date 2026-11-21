@@ -5,6 +5,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AppError,
   AuthState,
+  UpdaterState,
   Bootstrap,
   DeviceInfo,
   Catalog,
@@ -39,6 +40,8 @@ export const api = {
   authReopen: (url: string) => invoke<void>("auth_reopen", { url }),
   authSignOut: () => invoke<void>("auth_sign_out"),
   openAccountPage: () => invoke<void>("open_account_page"),
+  launcherUpdateCheck: () => invoke<UpdaterState>("launcher_update_check"),
+  launcherUpdateInstall: () => invoke<void>("launcher_update_install"),
   install: (item: string, channel: string, path?: string, version?: string) =>
     invoke<Job>("install", { item, channel, path, version }),
   pauseJob: (id: number) => invoke<void>("pause_job", { id }),
@@ -57,6 +60,7 @@ export interface Events {
   "catalog:status": CatalogStatus;
   "auth:changed": AuthState;
   "auth:device-failed": string;
+  "updater:state": UpdaterState;
   "library:changed": Library;
   "settings:changed": Settings;
   "process:changed": { item: string; running: boolean };

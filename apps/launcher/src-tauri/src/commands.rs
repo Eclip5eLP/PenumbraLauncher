@@ -31,6 +31,7 @@ pub struct Bootstrap {
     running: Vec<String>,
     suggested_library: String,
     auth: crate::auth::AuthState,
+    updater: crate::updater::UpdaterState,
     mock: bool,
 }
 
@@ -52,6 +53,7 @@ pub fn get_bootstrap(app: AppHandle, state: State<'_, AppState>) -> Bootstrap {
         running: state.running.lock().unwrap().keys().cloned().collect(),
         suggested_library: suggested,
         auth: state.auth.state(),
+        updater: state.updater.view.lock().unwrap().clone(),
         mock: false,
     }
 }
@@ -435,4 +437,16 @@ pub async fn auth_sign_out(app: AppHandle) {
 #[tauri::command]
 pub fn open_account_page(app: AppHandle) {
     crate::auth::open_verification(&app, crate::auth::ACCOUNTS);
+}
+
+// ---- launcher self-update ----------------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn launcher_update_check(app: AppHandle) -> AppResult<crate::updater::UpdaterState> {
+    crate::updater::check(app, false).await.map_err(AppError::InvalidState)
+}
+
+#[tauri::command]
+pub async fn launcher_update_install(app: AppHandle) -> AppResult<()> {
+    crate::updater::install(app).await.map_err(AppError::InvalidState)
 }

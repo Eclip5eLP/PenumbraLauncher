@@ -95,3 +95,11 @@ it before the bot ships exe releases. `requires: python` is checked first.
 **ADR-024 (2026-11-21) Credential Manager via windows-sys, not the keyring crate.** keyring 4 just changed its API
 (keyring-core stores); the three Win32 calls we need (CredWriteW/CredReadW/CredDeleteW) are ~60 lines and have no
 moving parts.
+
+**ADR-025 (2026-11-21) Keep Tauri's default install folder.** The per-user NSIS install goes to
+`%LOCALAPPDATA%\Penumbra Launcher`, which is also our local data folder (cache, logs). Harmless (the uninstaller
+removes only its own files) and avoids a data migration; revisit if the uninstaller should wipe caches.
+
+**ADR-026 (2026-11-21) Updates install only on a click.** Downloads happen in the background, but replacing the
+launcher waits for "Restart to update" (or the next manual install), so a running game or download is never
+interrupted by surprise.

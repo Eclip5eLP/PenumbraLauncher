@@ -16,6 +16,7 @@ mod process;
 mod settings;
 mod state;
 mod sys;
+mod updater;
 
 use std::time::{Duration, Instant};
 
@@ -77,6 +78,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState::new(started, settings))
         .setup(|app| {
             let handle = app.handle().clone();
@@ -84,6 +86,9 @@ pub fn run() {
             let resume = state.settings.lock().unwrap().resume_on_start;
             state.jobs.restore(resume);
             state.jobs.start(handle.clone());
+            if !cfg!(debug_assertions) {
+                updater::start(handle.clone()); // dev builds don't update themselves
+            }
             // Keep the catalog fresh while the launcher stays open (new versions -> update badges / auto-update).
             let h2 = handle.clone();
             tauri::async_runtime::spawn(async move {
@@ -113,6 +118,8 @@ pub fn run() {
             commands::auth_reopen,
             commands::auth_sign_out,
             commands::open_account_page,
+            commands::launcher_update_check,
+            commands::launcher_update_install,
             commands::install,
             commands::verify,
             commands::pause_job,

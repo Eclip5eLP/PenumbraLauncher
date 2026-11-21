@@ -9,6 +9,7 @@
 
   import LogOut from "@lucide/svelte/icons/log-out";
   import ExternalLink from "@lucide/svelte/icons/external-link";
+  import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import Menu, { type MenuEntry } from "./Menu.svelte";
   import { api, inTauri } from "../api";
 
@@ -31,6 +32,23 @@
     {#if app.mock}<span class="mock" title={t("settings.mock")}>MOCK</span>{/if}
   </div>
   <div class="right">
+    {#if app.updater.state === "ready" || app.updater.state === "available" || app.updater.state === "installing"}
+      <button
+        class="pill"
+        disabled={app.updater.state === "installing"}
+        onclick={() => app.run(api.launcherUpdateInstall())}
+        title={app.updater.version ?? ""}
+      >
+        <RefreshCw size={13} class={app.updater.state === "installing" ? "spin" : ""} />
+        {app.updater.state === "ready"
+          ? t("updater.restart")
+          : app.updater.state === "installing"
+            ? t("updater.installing")
+            : t("updater.available", { v: app.updater.version ?? "" })}
+      </button>
+    {:else if app.updater.state === "downloading"}
+      <span class="pill quiet">{t("updater.downloading", { p: app.updater.progress ?? 0 })}</span>
+    {/if}
     {#if app.auth.signedIn}
       <Menu entries={accountMenu} placement="bottom-end">
         {#snippet trigger(toggle, open)}
@@ -123,6 +141,26 @@
     border-radius: 50%;
     background: linear-gradient(135deg, var(--brand-1), var(--brand-2));
     color: #fff;
+  }
+  .pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 12px;
+    margin-right: 8px;
+    border-radius: 13px;
+    background: var(--ok);
+    color: #fff;
+    font-size: 0.85em;
+    font-weight: 600;
+  }
+  .pill:hover:not(:disabled) {
+    filter: brightness(1.1);
+  }
+  .pill.quiet {
+    background: rgb(255 255 255 / 0.1);
+    color: var(--text-2);
   }
   .sep {
     width: 1px;

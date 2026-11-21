@@ -1,7 +1,9 @@
 # 09 — Self-update & release
 
 ## Installer
-- Tauri NSIS bundle, `installMode: currentUser` → `%LOCALAPPDATA%\Programs\Penumbra Launcher`, no admin prompt.
+- Tauri NSIS bundle, `installMode: currentUser` → `%LOCALAPPDATA%\Penumbra Launcher` (Tauri's per-user default),
+  no admin prompt. That folder also holds our `cache\` and `logs\` (paths.rs local_dir); the uninstaller only
+  removes the files it installed, so they survive an uninstall (ADR-025). Uninstall entry: HKCU, "Penumbra Launcher".
 - WebView2: `embedBootstrapper` (Win 10 without WebView2 still works; Win 11 has it built in).
 - Registers `penumbra://` URL protocol, Start menu shortcut, optional desktop shortcut, uninstaller
   (asks whether to keep games — default keep; games live in libraries, not in the program folder).
@@ -15,6 +17,19 @@
   "Restart to update" pill in the title bar; applied on restart, or automatically on next start if
   `autoUpdateLauncher`. Never interrupt running downloads: the pill waits; restart pauses jobs (they resume).
 - `latest.json` may contain `"minimum": "<ver>"` → forced update screen for breaking server changes.
+
+## As implemented (M6)
+- `updater.rs`: check 10 s after start + every 6 h (release builds only; dev builds never update themselves),
+  endpoint from `apiBase` + `launcher/latest.json` or `latest-beta.json` (launcher channel setting). With
+  `autoUpdateLauncher` the installer downloads in the background -> title bar pill "Restart to update";
+  otherwise the pill offers "Update to x". Install refuses while a game runs; running downloads resume from their
+  journal after the restart. Settings > About has "Check for updates".
+- `tools/release.ps1 -Version x.y.z [-Channel beta] [-Notes ..] [-SkipTests] [-NoUpload]`: needs a clean `dev`
+  tree; bumps versions, builds `--bundles nsis` with `TAURI_SIGNING_PRIVATE_KEY(_PASSWORD)` from
+  `C:\Eclip5eDev\keys`, stages `launcher/PenumbraLauncher_<v>_x64-setup.exe(.sig)` + manifests, commits, tags
+  `launcher-v<v>` (dev only), uploads (installer before `latest*.json`). `latest.json` also carries `installer`
+  and `size` for the landing page.
+- Released so far: 0.1.0, 0.1.1 (2026-11-21).
 
 ## Versioning
 SemVer `MAJOR.MINOR.PATCH`, `-beta.N` for beta channel. Single source of truth: `apps/launcher/src-tauri/tauri.conf.json`

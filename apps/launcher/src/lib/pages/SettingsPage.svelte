@@ -130,6 +130,36 @@
           <span>{t("app.name")}</span><span>{t("settings.version", { v: app.appVersion })}</span>
         </div>
         <div class="kv"><span>Startup</span><span>{t("settings.startup", { ms: app.startupMs })}</span></div>
+        <div class="kv">
+          <span>
+            {#if app.updater.state === "ready"}
+              {t("updater.newVersion", { v: app.updater.version ?? "" })}
+            {:else if app.updater.state === "checking"}
+              {t("updater.checking")}
+            {:else if app.updater.state === "downloading"}
+              {t("updater.downloading", { p: app.updater.progress ?? 0 })}
+            {:else if app.updater.state === "error"}
+              <span class="muted">{app.updater.error}</span>
+            {:else if app.updater.state === "available"}
+              {t("updater.available", { v: app.updater.version ?? "" })}
+            {:else}
+              {t("updater.upToDate")}
+            {/if}
+          </span>
+          {#if app.updater.state === "ready" || app.updater.state === "available"}
+            <button class="btn primary" onclick={() => app.run(api.launcherUpdateInstall())}>
+              {t("updater.install")}
+            </button>
+          {:else}
+            <button
+              class="btn"
+              disabled={app.updater.state === "checking" || app.updater.state === "downloading"}
+              onclick={() => app.run(api.launcherUpdateCheck())}
+            >
+              {t("updater.check")}
+            </button>
+          {/if}
+        </div>
         {#if app.mock}<p class="note">{t("settings.mock")}</p>{/if}
       </div>
     {/if}

@@ -178,6 +178,17 @@ export const en = {
     guestInfo: "Sign in to download account-only content. Cloud saves and settings sync follow later.",
     signIn: "Sign in",
   },
+  updater: {
+    restart: "Restart to update",
+    available: "Update to {v}",
+    downloading: "Downloading update… {p}%",
+    installing: "Installing update…",
+    check: "Check for updates",
+    upToDate: "The launcher is up to date.",
+    checking: "Checking…",
+    newVersion: "Version {v} is ready to install.",
+    install: "Install and restart",
+  },
   toast: {
     installed: "{name} is ready to play",
     repaired: "{name}: all files are OK",

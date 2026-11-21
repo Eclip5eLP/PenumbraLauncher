@@ -70,6 +70,8 @@ impl Workspace {
             Some("content") | Some("data") => 2,
             Some("catalog") if r.ends_with("items.jsonl") => 4, // the very last file: makes the release live
             Some("catalog") => 3,
+            // Launcher updater manifests point at the installer: they must arrive after it.
+            Some("launcher") if r.ends_with(".json") => 6,
             _ => 5,
         };
         files.sort_by(|a, b| rank(&a.1).cmp(&rank(&b.1)).then(a.1.cmp(&b.1)));

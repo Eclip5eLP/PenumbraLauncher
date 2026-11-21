@@ -14,4 +14,5 @@
   tree in a temporary index (working tree untouched), removes the private paths, double-checks nothing private is
   left, and adds the commit on top of `main`. `main` has no shared history with `dev` (ADR-012).
 - Sync at milestone ends or whenever the public repo should be updated; there's no need to sync every commit.
-- Release tags (`launcher-vX.Y.Z`) are set on `main` (public) after syncing, and mirrored on `dev`.
+- Release tags (`launcher-vX.Y.Z`) live on `dev` only (pushed to `origin`). Never push them to `public`: they point
+  at private history. If public tags are wanted, tag the matching `main` snapshot commit separately.

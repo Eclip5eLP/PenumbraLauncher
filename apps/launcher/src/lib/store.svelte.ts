@@ -2,7 +2,17 @@
 // never deep-proxied, so 10 Hz progress updates stay cheap.
 import { api, errorMessage, on } from "./api";
 import { setLanguage, t } from "./i18n";
-import type { AuthState, Bootstrap, Catalog, CatalogStatus, Item, Job, Library, Settings } from "./types";
+import type {
+  AuthState,
+  Bootstrap,
+  Catalog,
+  CatalogStatus,
+  Item,
+  Job,
+  Library,
+  Settings,
+  UpdaterState,
+} from "./types";
 
 export type Route =
   | { page: "item"; id: string }
@@ -64,6 +74,7 @@ class AppStore {
   catalogStatus = $state.raw<CatalogStatus>({ state: "loading" });
   suggestedLibrary = "";
   auth = $state.raw<AuthState>({ signedIn: false });
+  updater = $state.raw<UpdaterState>({ state: "idle" });
   route = $state<Route>({ page: "library" });
   channelPref = $state<Record<string, string>>({});
   dialog = $state<Dialog | null>(null);
@@ -81,6 +92,7 @@ class AppStore {
     this.catalogStatus = b.catalogStatus;
     this.suggestedLibrary = b.suggestedLibrary;
     this.auth = b.auth;
+    this.updater = b.updater;
     setLanguage(b.settings.language);
     this.applyMotion();
     this.pickStartRoute();
@@ -124,6 +136,7 @@ class AppStore {
           this.pickStartRoute();
       }),
       on("catalog:status", (s) => (this.catalogStatus = s)),
+      on("updater:state", (u) => (this.updater = u)),
       on("auth:changed", (a) => {
         const was = this.auth.signedIn;
         this.auth = a;

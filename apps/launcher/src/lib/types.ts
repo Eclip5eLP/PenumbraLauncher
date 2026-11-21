@@ -173,6 +173,14 @@ export interface DeviceInfo {
   expiresIn: number;
 }
 
+export interface UpdaterState {
+  state: "idle" | "checking" | "available" | "downloading" | "ready" | "installing" | "error" | "";
+  version?: string | null;
+  notes?: string | null;
+  progress?: number | null;
+  error?: string | null;
+}
+
 export interface CatalogStatus {
   state: "loading" | "ok" | "offline" | "error";
   message?: string | null;
@@ -188,6 +196,7 @@ export interface Bootstrap {
   catalogStatus: CatalogStatus;
   suggestedLibrary: string;
   auth: AuthState;
+  updater: UpdaterState;
   mock: boolean;
 }
 

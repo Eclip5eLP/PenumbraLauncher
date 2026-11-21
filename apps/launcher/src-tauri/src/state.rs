@@ -26,6 +26,7 @@ pub struct AppState {
     pub jobs: JobManager,
     pub http: reqwest::Client,
     pub auth: crate::auth::Auth,
+    pub updater: crate::updater::Updater,
     pub limiter: Limiter,
 }
 
@@ -49,6 +50,7 @@ impl AppState {
                 a
             },
             limiter: Limiter::default(),
+            updater: crate::updater::Updater::default(),
         }
     }
 
