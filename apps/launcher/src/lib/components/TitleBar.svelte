@@ -7,7 +7,17 @@
   import { t } from "../i18n";
   import { app } from "../store.svelte";
 
-  import { inTauri } from "../api";
+  import LogOut from "@lucide/svelte/icons/log-out";
+  import ExternalLink from "@lucide/svelte/icons/external-link";
+  import Menu, { type MenuEntry } from "./Menu.svelte";
+  import { api, inTauri } from "../api";
+
+  const accountMenu = $derived<(MenuEntry | "sep")[]>([
+    { label: t("account.signedInAs", { name: app.auth.user?.username ?? "" }), disabled: true },
+    "sep",
+    { label: t("account.manage"), icon: ExternalLink, onclick: () => app.run(api.openAccountPage()) },
+    { label: t("account.signOut"), icon: LogOut, danger: true, onclick: () => app.run(api.authSignOut()) },
+  ]);
 
   let { overlay = false }: { overlay?: boolean } = $props();
   // Browser dev preview has no native window: buttons become no-ops.
@@ -21,10 +31,21 @@
     {#if app.mock}<span class="mock" title={t("settings.mock")}>MOCK</span>{/if}
   </div>
   <div class="right">
-    <button class="account" onclick={() => app.go({ page: "settings", section: "account" })}>
-      <span class="avatar"><User size={14} /></span>
-      <span>{t("titlebar.guest")}</span>
-    </button>
+    {#if app.auth.signedIn}
+      <Menu entries={accountMenu} placement="bottom-end">
+        {#snippet trigger(toggle, open)}
+          <button class="account" class:open onclick={toggle}>
+            <span class="avatar initial">{(app.auth.user?.username ?? "?")[0].toUpperCase()}</span>
+            <span>{app.auth.user?.username}</span>
+          </button>
+        {/snippet}
+      </Menu>
+    {:else}
+      <button class="account" onclick={() => (app.dialog = { kind: "signin" })}>
+        <span class="avatar"><User size={14} /></span>
+        <span>{t("titlebar.signIn")}</span>
+      </button>
+    {/if}
     <div class="sep"></div>
     <button class="win" aria-label={t("titlebar.minimize")} onclick={() => win.minimize()}>
       <Minus size={16} />
@@ -85,6 +106,11 @@
     font-size: 0.9em;
     transition: background var(--fast);
   }
+  .avatar.initial {
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .account.open,
   .account:hover {
     background: rgb(255 255 255 / 0.1);
     color: var(--text);

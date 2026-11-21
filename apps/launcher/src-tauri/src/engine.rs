@@ -82,7 +82,7 @@ pub async fn run(app: AppHandle, spec: Spec, prog: Arc<Progress>) -> R<Outcome> 
         return crate::archive::run(app.clone(), spec, item, prog).await;
     }
     prog.phase.store(PHASE_PREPARING, Ordering::Relaxed);
-    let (manifest, manifest_bytes) = fetch_manifest(&state, &spec.item, &spec.version).await?;
+    let (manifest, manifest_bytes) = fetch_manifest(&app, &state, &spec.item, &spec.version).await?;
     let install = spec.path.clone();
     let meta = library::meta_dir(&install);
     std::fs::create_dir_all(&meta).map_err(io("creating install folder"))?;
@@ -200,7 +200,7 @@ async fn get(state: &AppState, url: &str) -> R<reqwest::Response> {
     Err(format!("download failed ({last})"))
 }
 
-async fn fetch_manifest(state: &AppState, item: &str, version: &str) -> R<(Manifest, Vec<u8>)> {
+async fn fetch_manifest(app: &AppHandle, state: &AppState, item: &str, version: &str) -> R<(Manifest, Vec<u8>)> {
     let base = state.api_base();
     let v = path_segment(version);
     // Public manifests come from the CDN; gated ones only through the API.
@@ -214,7 +214,12 @@ async fn fetch_manifest(state: &AppState, item: &str, version: &str) -> R<(Manif
             }
             (zst.to_vec(), s.text().await.map_err(io("signature"))?)
         } else {
-            let r = get(state, &format!("{base}api/v1/manifest.php?item={item}&version={v}")).await?;
+            let url = format!("{base}api/v1/manifest.php?item={item}&version={v}");
+            let mut req = state.http.get(&url);
+            if let Some(tok) = state.auth.access_token(app).await {
+                req = req.bearer_auth(tok);
+            }
+            let r = req.send().await.map_err(|e| format!("download failed ({e})"))?;
             match r.status().as_u16() {
                 200 => {}
                 401 => return Err("Sign in to download this.".into()),

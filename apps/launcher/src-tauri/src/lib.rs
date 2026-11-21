@@ -1,8 +1,10 @@
 //! Penumbra Launcher backend. Architecture: docs/02-architecture.md, docs/05-launcher-app.md.
 
 mod archive;
+mod auth;
 mod catalog;
 mod commands;
+mod cred;
 mod engine;
 mod error;
 mod github;
@@ -106,6 +108,11 @@ pub fn run() {
             commands::app_ready,
             commands::set_settings,
             commands::refresh_catalog,
+            commands::auth_start,
+            commands::auth_cancel,
+            commands::auth_reopen,
+            commands::auth_sign_out,
+            commands::open_account_page,
             commands::install,
             commands::verify,
             commands::pause_job,

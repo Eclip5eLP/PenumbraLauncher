@@ -146,3 +146,9 @@ pub fn list(ws: &Workspace, only: Option<&str>) -> Result<()> {
     }
     Ok(())
 }
+
+/// The item's `access` rule from catalog/<id>/item.json, if the item exists.
+pub fn item_access(ws: &Workspace, id: &str) -> Option<String> {
+    let v = read_json(&item_path(ws, id)).ok()?;
+    Some(v.get("access").and_then(Value::as_str).unwrap_or("public").to_string())
+}

@@ -56,6 +56,8 @@ pub struct BuildArgs {
     pub spec: BuildSpec,
     pub level: i32,
     pub offline: bool,
+    /// Store the manifest privately even if the item is public (e.g. a restricted beta channel).
+    pub gated: bool,
 }
 
 pub fn build(ws: &Workspace, args: BuildArgs) -> Result<()> {
@@ -82,7 +84,7 @@ pub fn build(ws: &Workspace, args: BuildArgs) -> Result<()> {
         // Published versions are immutable: Cloudflare caches manifests at the edge for hours.
         let server = ws.config()?.server;
         let exists = server.run(&format!(
-            "test -e '{}/content/{item}/{}.json.zst' && echo yes || true",
+            "(test -e '{0}/content/{item}/{1}.json.zst' || test -e '{0}/data/content/{item}/{1}.json.zst') && echo yes || true",
             server.root, args.version
         ))?;
         if exists.trim() == "yes" {
@@ -141,7 +143,13 @@ pub fn build(ws: &Workspace, args: BuildArgs) -> Result<()> {
     std::fs::write(vdir.join("manifest.json"), serde_json::to_vec_pretty(&manifest)?)?;
     std::fs::write(vdir.join("manifest.json.sig"), &sig)?;
     // Staged for upload: exactly the signed bytes, compressed.
-    let stage_base = format!("content/{item}/{}", args.version);
+    // Non-public items: the manifest lives in data/ (never served statically) and only manifest.php hands it out
+    // after an access check. Chunks stay public but unguessable (ADR-008).
+    let gated = args.gated || crate::catalog::item_access(ws, item).is_some_and(|a| a != "public");
+    let stage_base = format!("{}content/{item}/{}", if gated { "data/" } else { "" }, args.version);
+    if gated {
+        eprintln!("      gated item: manifest goes to data/content (served only via api/v1/manifest.php)");
+    }
     ws.stage_write(&format!("{stage_base}.json.zst"), &zstd::bulk::compress(&json, 19)?)?;
     ws.stage_write(&format!("{stage_base}.json.sig"), sig.as_bytes())?;
     std::fs::remove_dir_all(&tree).ok();

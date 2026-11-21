@@ -30,6 +30,7 @@ pub struct Bootstrap {
     jobs: Vec<JobView>,
     running: Vec<String>,
     suggested_library: String,
+    auth: crate::auth::AuthState,
     mock: bool,
 }
 
@@ -50,6 +51,7 @@ pub fn get_bootstrap(app: AppHandle, state: State<'_, AppState>) -> Bootstrap {
         jobs: state.jobs.list(),
         running: state.running.lock().unwrap().keys().cloned().collect(),
         suggested_library: suggested,
+        auth: state.auth.state(),
         mock: false,
     }
 }
@@ -99,6 +101,9 @@ fn installable(state: &AppState, item: &str, channel: &str) -> AppResult<(penumb
     let it = state.item(item).ok_or_else(|| AppError::UnknownItem(item.into()))?;
     if it.kind == ItemType::Link || it.status == ItemStatus::ComingSoon {
         return Err(AppError::InvalidState(format!("{} can't be installed", it.name)));
+    }
+    if it.access != "public" && !state.auth.state().signed_in {
+        return Err(AppError::InvalidState("Sign in with your Penumbra Account to download this.".into()));
     }
     let ch = it.channels.get(channel).ok_or_else(|| AppError::InvalidState(format!("no channel {channel}")))?;
     let version = ch.version.clone().ok_or_else(|| AppError::InvalidState("nothing published on this channel yet".into()))?;
@@ -402,4 +407,32 @@ fn check_requirements(reqs: &[penumbra_core::catalog::Requirement]) -> AppResult
         }
     }
     Ok(())
+}
+
+// ---- account ---------------------------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn auth_start(app: AppHandle) -> AppResult<crate::auth::DeviceInfo> {
+    app.state::<AppState>().auth.start_device(&app).await.map_err(AppError::InvalidState)
+}
+
+#[tauri::command]
+pub fn auth_cancel(state: State<'_, AppState>) {
+    state.auth.cancel_device();
+}
+
+/// Opens the sign-in page again (only account-server URLs).
+#[tauri::command]
+pub fn auth_reopen(app: AppHandle, url: String) {
+    crate::auth::open_verification(&app, &url);
+}
+
+#[tauri::command]
+pub async fn auth_sign_out(app: AppHandle) {
+    app.state::<AppState>().auth.sign_out(&app).await;
+}
+
+#[tauri::command]
+pub fn open_account_page(app: AppHandle) {
+    crate::auth::open_verification(&app, crate::auth::ACCOUNTS);
 }

@@ -5,6 +5,7 @@
   import Toasts from "./lib/components/Toasts.svelte";
   import InstallDialog from "./lib/components/InstallDialog.svelte";
   import UninstallDialog from "./lib/components/UninstallDialog.svelte";
+  import SignInDialog from "./lib/components/SignInDialog.svelte";
   import ItemPage from "./lib/pages/ItemPage.svelte";
   import LibraryPage from "./lib/pages/LibraryPage.svelte";
   import DownloadsPage from "./lib/pages/DownloadsPage.svelte";
@@ -33,6 +34,8 @@
   <InstallDialog id={app.dialog.item} />
 {:else if app.dialog?.kind === "uninstall"}
   <UninstallDialog id={app.dialog.item} />
+{:else if app.dialog?.kind === "signin"}
+  <SignInDialog />
 {/if}
 <Toasts />
 

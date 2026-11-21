@@ -51,6 +51,9 @@ enum Cmd {
         /// Don't ask the server which chunks already exist.
         #[arg(long)]
         offline: bool,
+        /// Keep the manifest private (data/content) even for a public item, e.g. for a restricted channel.
+        #[arg(long)]
+        gated: bool,
     },
     /// Point a channel of an item at a built version, then stage the signed catalog.
     Promote {
@@ -105,7 +108,7 @@ fn main() -> Result<()> {
 
     match cli.cmd {
         Cmd::Keygen => keygen(&ws),
-        Cmd::Build { item, version, input, level, offline } => {
+        Cmd::Build { item, version, input, level, offline, gated } => {
             let spec_path = ws.catalog().join(&item).join("build.toml");
             let spec = if spec_path.exists() {
                 let s: builder::BuildSpec = toml::from_str(&std::fs::read_to_string(&spec_path)?)
@@ -117,7 +120,7 @@ fn main() -> Result<()> {
             } else {
                 builder::BuildSpec { item: item.clone(), ..Default::default() }
             };
-            builder::build(&ws, builder::BuildArgs { version, input, spec, level: level.clamp(1, 22), offline })
+            builder::build(&ws, builder::BuildArgs { version, input, spec, level: level.clamp(1, 22), offline, gated })
         }
         Cmd::Promote { item, version, channel } => catalog::promote(&ws, &item, &version, &channel),
         Cmd::Catalog => catalog::stage_catalog(&ws),
@@ -187,7 +190,10 @@ fn verify(ws: &Workspace, item: &str, version: &str) -> Result<()> {
         }
     }
     let base = format!("content/{item}/{version}");
-    let ls = server.run(&format!("cd '{}' && ls {base}.json.zst {base}.json.sig 2>&1 || true", server.root))?;
+    let ls = server.run(&format!(
+        "cd '{0}' && (ls {base}.json.zst {base}.json.sig 2>/dev/null || ls data/{base}.json.zst data/{base}.json.sig) 2>&1 || true",
+        server.root
+    ))?;
     if missing.is_empty() && !ls.contains("No such file") {
         eprintln!("ok: manifest and all {} chunks are on the server", m.files.iter().flat_map(|f| &f.chunks).count());
         Ok(())

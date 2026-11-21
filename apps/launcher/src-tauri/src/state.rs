@@ -25,6 +25,7 @@ pub struct AppState {
     pub running: Mutex<HashMap<String, Instant>>,
     pub jobs: JobManager,
     pub http: reqwest::Client,
+    pub auth: crate::auth::Auth,
     pub limiter: Limiter,
 }
 
@@ -42,6 +43,11 @@ impl AppState {
             running: Mutex::new(HashMap::new()),
             jobs: JobManager::default(),
             http: crate::net::client(),
+            auth: {
+                let a = crate::auth::Auth::default();
+                a.load();
+                a
+            },
             limiter: Limiter::default(),
         }
     }

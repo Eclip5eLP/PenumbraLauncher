@@ -155,6 +155,24 @@ export interface Settings {
   devMode: boolean;
 }
 
+export interface User {
+  id: number;
+  username: string;
+  role: string;
+}
+
+export interface AuthState {
+  signedIn: boolean;
+  user?: User | null;
+}
+
+export interface DeviceInfo {
+  userCode: string;
+  verificationUri: string;
+  verificationUriComplete: string;
+  expiresIn: number;
+}
+
 export interface CatalogStatus {
   state: "loading" | "ok" | "offline" | "error";
   message?: string | null;
@@ -169,6 +187,7 @@ export interface Bootstrap {
   running: string[];
   catalogStatus: CatalogStatus;
   suggestedLibrary: string;
+  auth: AuthState;
   mock: boolean;
 }
 

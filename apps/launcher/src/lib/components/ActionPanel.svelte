@@ -45,7 +45,7 @@
     paused: Play,
   };
   const spinning: Action[] = ["preparing", "finalizing"];
-  const disabled: Action[] = ["comingSoon", "unavailable", "running", "preparing", "finalizing", "locked"];
+  const disabled: Action[] = ["comingSoon", "unavailable", "running", "preparing", "finalizing"];
 
   const label = $derived.by(() => {
     switch (action) {

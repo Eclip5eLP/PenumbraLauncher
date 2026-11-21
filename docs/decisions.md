@@ -91,3 +91,7 @@ older/other file *of that same repository*.
 **ADR-023 (2026-11-21) Non-exe launch targets use the file association, untracked.** Python apps (PG Bot from
 source) start via `run_gui.py`'s association (py launcher). Tracking would need knowing the interpreter; not worth
 it before the bot ships exe releases. `requires: python` is checked first.
+
+**ADR-024 (2026-11-21) Credential Manager via windows-sys, not the keyring crate.** keyring 4 just changed its API
+(keyring-core stores); the three Win32 calls we need (CredWriteW/CredReadW/CredDeleteW) are ~60 lines and have no
+moving parts.

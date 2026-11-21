@@ -55,8 +55,13 @@ Each milestone ends with a working, committed state. Check boxes as work lands.
 - [ ] `penumbra-pack import-github` (only needed for private repos — later)
 
 ## M5 — Accounts
-- [ ] Device sign-in dialog, keyring, refresh mutex, sign-out, account chip
-- [ ] Personalised catalog, locked/restricted items, gated manifests
+- [x] Device sign-in dialog (code + copy + reopen browser), Credential Manager storage, serialized refresh with
+      rotation, sign-out (server revoke), account chip menu, settings section
+- [x] Personalised catalog (bearer + one retry on `X-Penumbra-Auth: invalid`), locked items -> sign-in, gated
+      manifests via `manifest.php` with token; publisher stages non-public manifests to `data/content`
+- [x] Admin-only test item `pltest` (role:admin): hidden + 401 for anonymous verified
+- [x] Signed-in E2E: device sign-in (user Eclip5e, admin), personalised catalog (+pltest), gated install,
+      restart -> silent refresh, sign-out (server revoke, credential + account.json removed, pltest hidden)
 
 ## M6 — Self-update & distribution
 - [ ] NSIS config, updater plugin, `release.ps1`, `latest.json`

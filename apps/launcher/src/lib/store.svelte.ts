@@ -2,7 +2,7 @@
 // never deep-proxied, so 10 Hz progress updates stay cheap.
 import { api, errorMessage, on } from "./api";
 import { setLanguage, t } from "./i18n";
-import type { Bootstrap, Catalog, CatalogStatus, Item, Job, Library, Settings } from "./types";
+import type { AuthState, Bootstrap, Catalog, CatalogStatus, Item, Job, Library, Settings } from "./types";
 
 export type Route =
   | { page: "item"; id: string }
@@ -10,7 +10,8 @@ export type Route =
   | { page: "downloads" }
   | { page: "settings"; section?: string };
 
-export type Dialog = { kind: "install"; item: string } | { kind: "uninstall"; item: string };
+export type Dialog =
+  { kind: "install"; item: string } | { kind: "uninstall"; item: string } | { kind: "signin" };
 
 export interface Toast {
   id: number;
@@ -62,6 +63,7 @@ class AppStore {
   running = $state.raw<string[]>([]);
   catalogStatus = $state.raw<CatalogStatus>({ state: "loading" });
   suggestedLibrary = "";
+  auth = $state.raw<AuthState>({ signedIn: false });
   route = $state<Route>({ page: "library" });
   channelPref = $state<Record<string, string>>({});
   dialog = $state<Dialog | null>(null);
@@ -78,6 +80,7 @@ class AppStore {
     this.running = b.running;
     this.catalogStatus = b.catalogStatus;
     this.suggestedLibrary = b.suggestedLibrary;
+    this.auth = b.auth;
     setLanguage(b.settings.language);
     this.applyMotion();
     this.pickStartRoute();
@@ -121,6 +124,16 @@ class AppStore {
           this.pickStartRoute();
       }),
       on("catalog:status", (s) => (this.catalogStatus = s)),
+      on("auth:changed", (a) => {
+        const was = this.auth.signedIn;
+        this.auth = a;
+        if (a.signedIn && !was) {
+          if (this.dialog?.kind === "signin") this.dialog = null;
+          this.toast("ok", t("account.welcome", { name: a.user?.username ?? "" }));
+        } else if (!a.signedIn && was) {
+          this.toast("info", t("account.signedOut"));
+        }
+      }),
       on("settings:changed", (s) => {
         this.settings = s;
         setLanguage(s.language);
@@ -165,7 +178,7 @@ class AppStore {
   action(item: Item): Action {
     if (item.type === "link") return "open";
     if (item.status === "coming-soon") return "comingSoon";
-    if (item.locked) return "locked";
+    if (item.locked || (item.access !== "public" && !this.auth.signedIn)) return "locked";
     const job = this.activeJob(item.id);
     if (job) return job.state as Action;
     if (this.running.includes(item.id)) return "running";
@@ -211,6 +224,9 @@ class AppStore {
       case "verifying":
       case "queued":
         return job && this.run(api.pauseJob(job.id));
+      case "locked":
+        this.dialog = { kind: "signin" };
+        return;
       case "paused":
         return job && this.run(api.resumeJob(job.id));
     }

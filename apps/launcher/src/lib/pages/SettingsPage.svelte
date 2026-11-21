@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from "../store.svelte";
+  import { api } from "../api";
   import { t, tDyn, type Key } from "../i18n";
   import type { Settings } from "../types";
 
@@ -89,7 +90,22 @@
     <h2>{tDyn(`settings.sections.${active.id}`)}</h2>
 
     {#if active.id === "account"}
-      <p class="note">{t("settings.accountSoon")}</p>
+      {#if app.auth.signedIn}
+        <div class="field">
+          <span>{t("account.signedInAs", { name: app.auth.user?.username ?? "" })}</span>
+          <span class="row-btns">
+            <button class="btn" onclick={() => app.run(api.openAccountPage())}>{t("account.manage")}</button>
+            <button class="btn" onclick={() => app.run(api.authSignOut())}>{t("account.signOut")}</button>
+          </span>
+        </div>
+      {:else}
+        <div class="field">
+          <span class="muted">{t("account.guestInfo")}</span>
+          <button class="btn primary" onclick={() => (app.dialog = { kind: "signin" })}>
+            {t("account.signIn")}
+          </button>
+        </div>
+      {/if}
       <div class="field">
         <span>{t("settings.syncSettings")}</span>
         <input
@@ -274,6 +290,11 @@
   }
   .switch:checked::after {
     transform: translateX(18px);
+  }
+  .row-btns {
+    display: flex;
+    flex-direction: row !important;
+    gap: 8px;
   }
   .note {
     padding: 12px 14px;

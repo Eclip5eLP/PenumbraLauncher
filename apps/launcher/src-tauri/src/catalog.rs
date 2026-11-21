@@ -92,18 +92,33 @@ pub async fn refresh(app: AppHandle) {
     }
     status(&app, "loading", None);
     let etag = state.catalog_etag.lock().unwrap().clone();
-    let mut req = state.http.get(format!("{base}api/v1/catalog.php"));
-    if let Some(e) = &etag {
-        req = req.header("If-None-Match", e);
-    }
-    let resp = match req.send().await {
-        Ok(r) => r,
-        Err(e) => {
-            tracing::warn!("catalog refresh failed: {e}");
-            status(&app, "error", Some("Can't reach the Penumbra server. Showing the last known catalog.".into()));
-            return;
+    let mut resp = None;
+    // Signed in: personalised catalog. A rejected token is refreshed once and the request repeated.
+    for attempt in 0..2 {
+        let mut req = state.http.get(format!("{base}api/v1/catalog.php"));
+        if let Some(e) = &etag {
+            req = req.header("If-None-Match", e);
         }
-    };
+        if let Some(tok) = state.auth.access_token(&app).await {
+            req = req.bearer_auth(tok);
+        }
+        let r = match req.send().await {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!("catalog refresh failed: {e}");
+                status(&app, "error", Some("Can't reach the Penumbra server. Showing the last known catalog.".into()));
+                return;
+            }
+        };
+        let rejected = r.headers().get("x-penumbra-auth").is_some_and(|v| v == "invalid");
+        if rejected && attempt == 0 {
+            state.auth.invalidate().await;
+            continue;
+        }
+        resp = Some(r);
+        break;
+    }
+    let Some(resp) = resp else { return };
     if resp.status() == reqwest::StatusCode::NOT_MODIFIED {
         status(&app, "ok", None);
         crate::jobs::auto_update(&app);

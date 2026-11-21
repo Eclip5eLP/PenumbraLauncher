@@ -2,7 +2,17 @@
 // Outside Tauri (plain browser during UI development) calls go to a dev-only mock backend.
 import { invoke as tauriInvoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { AppError, Bootstrap, Catalog, CatalogStatus, Job, Library, Settings } from "./types";
+import type {
+  AppError,
+  AuthState,
+  Bootstrap,
+  DeviceInfo,
+  Catalog,
+  CatalogStatus,
+  Job,
+  Library,
+  Settings,
+} from "./types";
 
 export const inTauri = isTauri();
 
@@ -24,6 +34,11 @@ export const api = {
   pickFolder: (start?: string) => invoke<string | null>("pick_folder", { start }),
   diskSpace: (path: string) => invoke<number | null>("disk_space", { path }),
   openFolder: (item: string) => invoke<void>("open_folder", { item }),
+  authStart: () => invoke<DeviceInfo>("auth_start"),
+  authCancel: () => invoke<void>("auth_cancel"),
+  authReopen: (url: string) => invoke<void>("auth_reopen", { url }),
+  authSignOut: () => invoke<void>("auth_sign_out"),
+  openAccountPage: () => invoke<void>("open_account_page"),
   install: (item: string, channel: string, path?: string, version?: string) =>
     invoke<Job>("install", { item, channel, path, version }),
   pauseJob: (id: number) => invoke<void>("pause_job", { id }),
@@ -40,6 +55,8 @@ export interface Events {
   "jobs:changed": Job[];
   "catalog:changed": Catalog;
   "catalog:status": CatalogStatus;
+  "auth:changed": AuthState;
+  "auth:device-failed": string;
   "library:changed": Library;
   "settings:changed": Settings;
   "process:changed": { item: string; running: boolean };

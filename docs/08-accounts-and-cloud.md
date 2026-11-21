@@ -28,6 +28,16 @@
 
 The user decided to keep the userbase as is (no loopback-redirect change), so device flow is final.
 
+## As implemented (M5)
+- `auth.rs`: device flow (`device.php` -> poll `token.php`, honours `slow_down`), access token in memory,
+  refresh token only in Windows Credential Manager (`cred.rs`, target `Penumbra Launcher/refresh_token`).
+  Refresh runs under one async mutex and stores the rotated refresh token before releasing it (a second refresh
+  with an old token would revoke the whole family). `invalid_grant` -> local sign-out.
+- `account.json` (APPDATA) caches the user (`id`, `username`, `role`) for instant display; no secrets.
+- Sign-out: `DELETE api/userinfo.php` (revokes the token family), then local cleanup.
+- Catalog requests carry the bearer token; sign-in/out triggers a catalog refresh (restricted items appear/vanish).
+- `penumbra-pack build` writes manifests of non-public items (or `--gated`) to `data/content/` (ADR-008).
+
 ## Gated content
 - Catalog items carry `access`. Signed-out users see `account` items as **locked** ("Sign in to download");
   `restricted` items (role/user lists) are not listed at all unless entitled.

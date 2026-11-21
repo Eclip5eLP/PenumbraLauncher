@@ -67,7 +67,7 @@ impl Workspace {
         let rank = |r: &str| match r.split('/').next() {
             Some("chunks") => 0,
             Some("media") => 1,
-            Some("content") => 2,
+            Some("content") | Some("data") => 2,
             Some("catalog") if r.ends_with("items.jsonl") => 4, // the very last file: makes the release live
             Some("catalog") => 3,
             _ => 5,

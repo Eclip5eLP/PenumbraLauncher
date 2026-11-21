@@ -118,6 +118,7 @@ export const mockInvoke = async (cmd: string, args: Record<string, unknown> = {}
         jobs,
         running,
         catalogStatus: { state: "ok" },
+        auth: { signedIn: false },
         suggestedLibrary: "D:\Penumbra Games",
         mock: true,
       } satisfies Bootstrap;
