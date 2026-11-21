@@ -99,6 +99,8 @@ export const en = {
     states: { done: "Done", cancelled: "Cancelled", error: "Failed" },
   },
   library: {
+    showHidden: "Show hidden",
+    hiddenTag: "Hidden",
     title: "Library",
     installed: "Installed",
     all: "All",
@@ -177,6 +179,20 @@ export const en = {
     signOut: "Sign out",
     guestInfo: "Sign in to download account-only content. Cloud saves and settings sync follow later.",
     signIn: "Sign in",
+  },
+  links: { unknown: "{id} isn't in the catalog (or needs a sign-in)." },
+  switcher: {
+    placeholder: "Search games, software and settings…",
+    empty: "Nothing found.",
+    hint: "↑↓ to move · Enter to open · Esc to close",
+    item: "Open",
+    page: "Go to",
+  },
+  railMenu: {
+    pin: "Pin to top",
+    unpin: "Unpin",
+    hide: "Hide from the rail",
+    unhide: "Show in the rail",
   },
   saves: {
     title: "Which saves do you want to keep?",

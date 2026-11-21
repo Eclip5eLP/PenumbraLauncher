@@ -16,6 +16,10 @@ use crate::settings::Settings;
 pub struct AppState {
     pub started: Instant,
     pub shown: AtomicBool,
+    /// Autostarted with "start minimized": keep the window hidden (tray only).
+    pub start_hidden: AtomicBool,
+    /// Deep link received before the UI was ready.
+    pub pending_link: Mutex<Option<crate::desktop::DeepLink>>,
     pub settings: Mutex<Settings>,
     pub catalog: RwLock<Catalog>,
     pub catalog_etag: Mutex<Option<String>>,
@@ -38,6 +42,8 @@ impl AppState {
         Self {
             started,
             shown: AtomicBool::new(false),
+            start_hidden: AtomicBool::new(false),
+            pending_link: Mutex::new(None),
             settings: Mutex::new(settings),
             catalog: RwLock::new(catalog),
             catalog_etag: Mutex::new(etag),

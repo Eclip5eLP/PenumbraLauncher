@@ -405,6 +405,8 @@ impl JobManager {
                 let _ = s.save();
             }
             let _ = app.emit("library:changed", lib);
+            let name = state.item(&item).map(|i| i.name).unwrap_or(item.clone());
+            crate::desktop::notify_done(app, &name, "Ready to play.");
         }
     }
 }

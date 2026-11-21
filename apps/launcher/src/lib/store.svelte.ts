@@ -2,12 +2,14 @@
 // never deep-proxied, so 10 Hz progress updates stay cheap.
 import { api, errorMessage, on } from "./api";
 import { setLanguage, t } from "./i18n";
+import type { MenuEntry } from "./components/Menu.svelte";
 import type {
   AuthState,
   Bootstrap,
   Catalog,
   CatalogStatus,
   CloudMeta,
+  DeepLink,
   Item,
   Job,
   Library,
@@ -112,6 +114,54 @@ class AppStore {
     this.route = id ? { page: "item", id } : { page: "library" };
   }
 
+  switcherOpen = $state(false);
+  context = $state<{ x: number; y: number; entries: (MenuEntry | "sep")[] } | null>(null);
+
+  openContext(e: MouseEvent, entries: (MenuEntry | "sep")[]) {
+    e.preventDefault();
+    this.context = { x: e.clientX, y: e.clientY, entries };
+  }
+
+  /** Right-click entries for an item (rail + library). */
+  itemMenu(item: Item): (MenuEntry | "sep")[] {
+    const installed = !!this.library[item.id];
+    const entries: (MenuEntry | "sep")[] = [
+      {
+        label: t(this.isPinned(item.id) ? "railMenu.unpin" : "railMenu.pin"),
+        onclick: () => this.togglePin(item.id),
+      },
+      {
+        label: t(this.isHidden(item.id) ? "railMenu.unhide" : "railMenu.hide"),
+        onclick: () => this.toggleHidden(item.id),
+      },
+    ];
+    if (installed) {
+      entries.push(
+        "sep",
+        { label: t("item.menu.openFolder"), onclick: () => void this.run(api.openFolder(item.id)) },
+        {
+          label: t("item.menu.verify"),
+          disabled: !!this.activeJob(item.id),
+          onclick: () => void this.run(api.verify(item.id)),
+        },
+      );
+    }
+    return entries;
+  }
+  dismissed = $state<string[]>(JSON.parse(readLocal("pl.dismissed") ?? "[]"));
+
+  dismiss(id: string) {
+    this.dismissed = [...this.dismissed, id];
+    writeLocal("pl.dismissed", JSON.stringify(this.dismissed));
+  }
+
+  get announcements() {
+    const now = Date.now();
+    return (this.catalog.announcements ?? []).filter(
+      (a) => !this.dismissed.includes(a.id) && (!a.until || Date.parse(a.until) > now),
+    );
+  }
+
   async listen() {
     await Promise.all([
       on("jobs:changed", (jobs) => {
@@ -145,6 +195,8 @@ class AppStore {
       on("updater:state", (u) => (this.updater = u)),
       on("notice", (n) => this.toast(n.kind, n.text, n.kind === "err" ? 8000 : 4000)),
       on("playtime:changed", (p) => (this.playtimeOther = p)),
+      on("deeplink", (l) => this.handleLink(l)),
+      on("navigate", (page) => this.go({ page })),
       on("auth:changed", (a) => {
         const was = this.auth.signedIn;
         this.auth = a;
@@ -166,12 +218,64 @@ class AppStore {
           : this.running.filter((i) => i !== item);
       }),
     ]);
+    // A link that started the launcher arrived before we were listening.
+    const pending = await api.takePendingLink().catch(() => null);
+    if (pending) this.handleLink(pending);
   }
 
   // ---- derived helpers -------------------------------------------------------------------------------
+  /** Rail/library order: pinned first, then the user's drag order, then catalog order. Hidden items left out. */
   get visibleItems(): Item[] {
     const hidden = new Set(this.settings.hiddenItems);
-    return this.catalog.items.filter((i) => !hidden.has(i.id));
+    return this.orderedItems.filter((i) => !hidden.has(i.id));
+  }
+
+  get orderedItems(): Item[] {
+    const pinned = this.settings.pinnedItems;
+    const order = this.settings.railOrder;
+    const rank = (i: Item, idx: number) => {
+      const p = pinned.indexOf(i.id);
+      const o = order.indexOf(i.id);
+      return [p === -1 ? 1 : 0, p === -1 ? 0 : p, o === -1 ? 1e6 + idx : o];
+    };
+    return this.catalog.items
+      .map((item, idx) => ({ item, r: rank(item, idx) }))
+      .sort((a, b) => a.r[0] - b.r[0] || a.r[1] - b.r[1] || a.r[2] - b.r[2])
+      .map((x) => x.item);
+  }
+
+  isPinned(id: string) {
+    return this.settings.pinnedItems.includes(id);
+  }
+  isHidden(id: string) {
+    return this.settings.hiddenItems.includes(id);
+  }
+  togglePin(id: string) {
+    const p = this.settings.pinnedItems;
+    void this.setSetting("pinnedItems", p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
+  }
+  toggleHidden(id: string) {
+    const h = this.settings.hiddenItems;
+    void this.setSetting("hiddenItems", h.includes(id) ? h.filter((x) => x !== id) : [...h, id]);
+  }
+  /** Drag & drop in the rail: put `dragged` right before `target`. */
+  moveBefore(dragged: string, target: string) {
+    if (dragged === target) return;
+    const ids = this.orderedItems.map((i) => i.id).filter((id) => id !== dragged);
+    ids.splice(ids.indexOf(target), 0, dragged);
+    void this.setSetting("railOrder", ids);
+  }
+
+  /** `penumbra://` links: navigate, and for install open the dialog — never install or start without a click. */
+  handleLink(link: DeepLink) {
+    const item = this.item(link.item);
+    if (!item) {
+      this.toast("info", t("links.unknown", { id: link.item }));
+      return;
+    }
+    this.go({ page: "item", id: item.id });
+    if (link.action === "install" && this.action(item) === "install")
+      this.dialog = { kind: "install", item: item.id };
   }
 
   item(id: string): Item | undefined {

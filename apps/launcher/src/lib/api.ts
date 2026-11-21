@@ -9,6 +9,7 @@ import type {
   Bootstrap,
   DeviceInfo,
   Catalog,
+  DeepLink,
   CatalogStatus,
   Job,
   Library,
@@ -52,6 +53,9 @@ export const api = {
   uninstall: (item: string) => invoke<void>("uninstall", { item }),
   launch: (item: string) => invoke<void>("launch", { item }),
   resolveSaves: (item: string, keep: "cloud" | "local") => invoke<void>("resolve_saves", { item, keep }),
+  takePendingLink: () => invoke<DeepLink | null>("take_pending_link"),
+  openNews: (item: string, id: string) => invoke<void>("open_news", { item, id }),
+  openAnnouncement: (id: string) => invoke<void>("open_announcement", { id }),
   openItemLink: (item: string, key?: string) => invoke<void>("open_item_link", { item, key }),
 };
 
@@ -64,6 +68,8 @@ export interface Events {
   "updater:state": UpdaterState;
   notice: { kind: "ok" | "err" | "info"; text: string };
   "playtime:changed": Record<string, number>;
+  deeplink: DeepLink;
+  navigate: "library" | "downloads";
   "library:changed": Library;
   "settings:changed": Settings;
   "process:changed": { item: string; running: boolean };

@@ -111,3 +111,11 @@ using the same bearer tokens. Settings and playtime (tiny) stay in the userbase 
 **ADR-028 (2026-11-21) Local data in the app-identifier folder.** `%LOCALAPPDATA%\com.eclip5e.penumbra.launcher`
 (cache, logs, save backups; WebView2 data was already there) so it never mixes with the program folder
 `%LOCALAPPDATA%\Penumbra Launcher` that the installer uses. Supersedes ADR-025.
+
+**ADR-029 (2026-11-21) No Mica.** Mica needs a transparent window (and a transparent page background), which costs
+compositing work on every frame and makes the look depend on the desktop wallpaper. The full-bleed game art
+already fills the window; not worth it.
+
+**ADR-030 (2026-11-21) Deep links never act on their own.** `penumbra://` can be triggered by any website, so links
+only navigate (and `install` only opens the install dialog). Only release builds register the scheme, so a dev
+build never becomes the system handler.

@@ -5,6 +5,7 @@ mod auth;
 mod catalog;
 mod cloudsave;
 mod commands;
+mod desktop;
 mod cred;
 mod engine;
 mod error;
@@ -65,11 +66,11 @@ pub fn run() {
 
     tauri::Builder::default()
         // Must be the first plugin: a second launch focuses the running window instead.
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.unminimize();
-                let _ = w.show();
-                let _ = w.set_focus();
+        // A `penumbra://` link opened while we run arrives here as an argument of the second start.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            desktop::show(app);
+            for a in args.iter().filter(|a| a.starts_with("penumbra://")) {
+                desktop::handle_url(app, a);
             }
         }))
         .plugin(
@@ -81,10 +82,42 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--autostart"])))
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_deep_link::init())
+        // Close button: hide to tray (setting) instead of quitting.
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let to_tray = window.app_handle().state::<AppState>().settings.lock().unwrap().close_button == "tray";
+                if to_tray {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+        })
         .manage(AppState::new(started, settings))
         .setup(|app| {
             let handle = app.handle().clone();
             let state = app.state::<AppState>();
+            if let Err(e) = desktop::create_tray(&handle) {
+                tracing::warn!("tray icon: {e}");
+            }
+            // Started by Windows at sign-in with "start minimized": stay in the tray.
+            let args: Vec<String> = std::env::args().collect();
+            if args.iter().any(|a| a == "--autostart") && state.settings.lock().unwrap().start_minimized {
+                state.start_hidden.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+            // Started by a `penumbra://` link: the UI picks it up once it's ready.
+            for a in args.iter().filter(|a| a.starts_with("penumbra://")) {
+                desktop::handle_url(&handle, a);
+            }
+            // Release builds register the link scheme for the current exe (the installer does it as well).
+            if !cfg!(debug_assertions) {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                if let Err(e) = app.deep_link().register_all() {
+                    tracing::warn!("registering penumbra:// failed: {e}");
+                }
+            }
             let resume = state.settings.lock().unwrap().resume_on_start;
             state.jobs.restore(resume);
             state.jobs.start(handle.clone());
@@ -136,6 +169,9 @@ pub fn run() {
             commands::disk_space,
             commands::open_folder,
             commands::launch,
+            commands::take_pending_link,
+            commands::open_news,
+            commands::open_announcement,
             commands::resolve_saves,
             commands::open_item_link,
         ])

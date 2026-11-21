@@ -72,7 +72,7 @@ pub fn app_ready(app: AppHandle, state: State<'_, AppState>, first_paint_ms: f64
 }
 
 pub fn show_main(app: &AppHandle, state: &AppState) -> AppResult<()> {
-    if state.shown.swap(true, Ordering::SeqCst) {
+    if state.shown.swap(true, Ordering::SeqCst) || state.start_hidden.load(Ordering::SeqCst) {
         return Ok(());
     }
     if let Some(w) = app.get_webview_window("main") {
@@ -89,6 +89,7 @@ pub async fn refresh_catalog(app: AppHandle) {
 
 #[tauri::command]
 pub fn set_settings(app: AppHandle, state: State<'_, AppState>, patch: Value) -> AppResult<Settings> {
+    let autostart = patch.get("startWithWindows").and_then(Value::as_bool);
     let synced = patch.as_object().is_some_and(|o| o.keys().any(|k| crate::sync::SYNC_KEYS.contains(&k.as_str())));
     let next = {
         let mut s = state.settings.lock().unwrap();
@@ -103,6 +104,9 @@ pub fn set_settings(app: AppHandle, state: State<'_, AppState>, patch: Value) ->
     let _ = app.emit("settings:changed", &next);
     if synced {
         crate::sync::schedule_push(&app);
+    }
+    if let Some(on) = autostart {
+        crate::desktop::apply_autostart(&app, on);
     }
     Ok(next)
 }
@@ -512,4 +516,32 @@ pub async fn launcher_update_check(app: AppHandle) -> AppResult<crate::updater::
 #[tauri::command]
 pub async fn launcher_update_install(app: AppHandle) -> AppResult<()> {
     crate::updater::install(app).await.map_err(AppError::InvalidState)
+}
+
+// ---- deep links, news ----------------------------------------------------------------------------------------
+
+/// A `penumbra://` link that arrived before the UI was listening (cleared once taken).
+#[tauri::command]
+pub fn take_pending_link(state: State<'_, AppState>) -> Option<crate::desktop::DeepLink> {
+    state.pending_link.lock().unwrap().take()
+}
+
+fn open_https(app: &AppHandle, url: Option<String>) -> AppResult<()> {
+    let url = url.filter(|u| u.starts_with("https://")).ok_or_else(|| AppError::InvalidState("no https link".into()))?;
+    app.opener().open_url(url, None::<&str>).map_err(|e| AppError::InvalidState(e.to_string()))
+}
+
+/// Opens a news post's link (looked up in the signed catalog, never taken from the UI).
+#[tauri::command]
+pub fn open_news(app: AppHandle, state: State<'_, AppState>, item: String, id: String) -> AppResult<()> {
+    let it = state.item(&item).ok_or_else(|| AppError::UnknownItem(item.clone()))?;
+    let url = it.news.iter().find(|n| n.id == id).and_then(|n| n.url.clone())
+        .or_else(|| it.banners.iter().find(|b| b.id == id).and_then(|b| b.url.clone()));
+    open_https(&app, url)
+}
+
+#[tauri::command]
+pub fn open_announcement(app: AppHandle, state: State<'_, AppState>, id: String) -> AppResult<()> {
+    let url = state.catalog.read().unwrap().announcements.iter().find(|a| a.id == id).and_then(|a| a.url.clone());
+    open_https(&app, url)
 }

@@ -12,7 +12,12 @@
 
 {#if item}
   <section class="item-page" style:--accent={accent}>
-    <Background src={item.media.bg} />
+    <Background
+      src={item.media.bg}
+      video={app.settings.backgroundVideo && !document.documentElement.hasAttribute("data-reduce-motion")
+        ? item.media.bgVideo
+        : null}
+    />
     <div class="content">
       {#key item.id}
         <div class="hero">

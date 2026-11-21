@@ -3,7 +3,17 @@
 
   // Crossfading full-bleed background. The next image is decoded before it's shown, so switching items never
   // flashes a half-loaded picture. At most two layers exist at any time.
-  let { src }: { src?: string | null } = $props();
+  let { src, video }: { src?: string | null; video?: string | null } = $props();
+  let videoEl = $state<HTMLVideoElement>();
+
+  // Background videos stop while the launcher is hidden or minimized (no CPU/GPU use in the background).
+  $effect(() => {
+    if (!videoEl) return;
+    const v = videoEl;
+    const sync = () => (document.hidden ? v.pause() : void v.play().catch(() => {}));
+    document.addEventListener("visibilitychange", sync);
+    return () => document.removeEventListener("visibilitychange", sync);
+  });
 
   let layers = $state<{ key: number; src: string }[]>([]);
   let nextKey = 0;
@@ -32,6 +42,12 @@
   {#each layers as l (l.key)}
     <img src={l.src} alt="" />
   {/each}
+  {#key video}
+    {#if video}
+      <video bind:this={videoEl} src={video} poster={src ?? undefined} autoplay muted loop playsinline
+      ></video>
+    {/if}
+  {/key}
   <div class="scrim"></div>
 </div>
 
@@ -55,6 +71,14 @@
     height: 100%;
     object-fit: cover;
     animation: fade-in 320ms var(--ease) both;
+  }
+  video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    animation: fade-in 600ms var(--ease) both;
   }
   .scrim {
     position: absolute;

@@ -14,6 +14,8 @@
       .filter((g) => g.items.length > 0),
   );
   const route = $derived(app.route);
+  let dragId = $state<string | null>(null);
+  let dropTarget = $state<string | null>(null);
 
   // Warm the image cache on hover so switching feels instant.
   const prefetched = new Set<string>();
@@ -61,8 +63,28 @@
           style:--item-accent={item.media.accent ?? "var(--accent)"}
           data-tip={item.name}
           aria-label={item.name}
+          class:drop-target={dropTarget === item.id}
+          draggable="true"
           onpointerenter={() => prefetch(item)}
           onclick={() => app.go({ page: "item", id: item.id })}
+          oncontextmenu={(e) => app.openContext(e, app.itemMenu(item))}
+          ondragstart={(e) => {
+            dragId = item.id;
+            e.dataTransfer?.setData("text/plain", item.id);
+          }}
+          ondragover={(e) => {
+            if (dragId && dragId !== item.id) {
+              e.preventDefault();
+              dropTarget = item.id;
+            }
+          }}
+          ondragleave={() => dropTarget === item.id && (dropTarget = null)}
+          ondrop={(e) => {
+            e.preventDefault();
+            if (dragId) app.moveBefore(dragId, item.id);
+            dragId = dropTarget = null;
+          }}
+          ondragend={() => (dragId = dropTarget = null)}
         >
           {#if item.media.icon}
             <img src={item.media.icon} alt="" width="44" height="44" />
@@ -219,6 +241,9 @@
   }
   .item.active::before {
     height: 32px;
+  }
+  .item.drop-target {
+    box-shadow: 0 -3px 0 0 var(--accent-2);
   }
   .item.active {
     box-shadow: 0 0 0 2px var(--item-accent);

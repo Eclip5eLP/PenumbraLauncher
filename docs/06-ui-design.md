@@ -55,3 +55,20 @@ font: Inter variable (self-hosted)
 ## Assets per item (made by publisher, see catalog/)
 icon 128×128 webp · logo ≤800×300 webp (transparent) · bg 1920×1080 webp (+ optional bg.webm ≤ 6 MB, 1080p,
 loop, muted) · banners 1280×600 webp · cover 600×900 webp (library grid).
+
+## Desktop integration + links (M8)
+- Tray: left click opens the window; menu Open / Library / Downloads / Quit. Close button hides to the tray when
+  Settings > General > Close button = "Minimize to tray" (default).
+- Start with Windows writes `HKCU\...\Run\Penumbra Launcher` = `<exe> --autostart`; with "Start minimized" the
+  window stays hidden (tray only).
+- Ctrl+K quick switcher (items, library, downloads, every settings section). Right-click on rail/library items:
+  pin, hide, open folder, verify. Drag rail icons to reorder (`railOrder`, synced).
+- `penumbra://open/<item>`, `penumbra://install/<item>` (opens the install dialog), `penumbra://play/<item>`
+  (navigates only). Registered by the installer and by release builds on start; dev builds don't register.
+
+"Open in launcher" button for any page on eclip5e.com (falls back to the download page if the launcher isn't installed
+— browsers simply do nothing for unknown schemes, so offer both):
+```html
+<a href="penumbra://open/gracidea">Open in Penumbra Launcher</a>
+<small>No launcher yet? <a href="https://eclip5e.com/penumbra/">Download it</a></small>
+```

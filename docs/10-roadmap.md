@@ -80,9 +80,12 @@ Each milestone ends with a working, committed state. Check boxes as work lands.
       settings pulled on restart. Found + fixed: dialog lost its `item` prop after closing.
 
 ## M8 — Polish
-- [ ] News carousel + posts (news.json per item), announcements
-- [ ] Background video, Mica, tray menu, start with Windows, notifications
-- [ ] Library grid, Ctrl+K quick switcher, rail reorder/pin/hide
+- [x] News carousel + posts (from the signed item; links via `open_news`), dismissible catalog announcements
+- [x] Background video (`media.bgVideo`, paused while hidden, off with reduced motion), tray menu, close-to-tray,
+      start with Windows (+ start minimized), Windows notifications when a download finishes in the background
+- [ ] Mica window effect — skipped (ADR-029)
+- [x] Library grid (M1), Ctrl+K quick switcher, rail drag-to-reorder, pin, hide (+ "Show hidden" in the library)
+- [x] `penumbra://open|install|play/<item>` deep links (never auto-install/start), "Open in launcher" list on
+      eclip5e.com/penumbra/ (other site pages: snippet in docs/06-ui-design.md)
 - [ ] German / Japanese translations (later, not a focus)
-- [ ] `penumbra://` deep links + "Install in launcher" buttons on the website
-- [ ] Optional admin page for catalog/news editing
+- [ ] Optional admin page for catalog/news editing (not started)

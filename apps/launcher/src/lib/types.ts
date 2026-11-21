@@ -69,12 +69,25 @@ export interface Group {
   name: string;
 }
 
+export interface Announcement {
+  id: string;
+  title: string;
+  url?: string | null;
+  until?: string | null;
+}
+
 export interface Catalog {
   format: number;
   generated: string;
   mirrors: string[];
   groups: Group[];
   items: Item[];
+  announcements?: Announcement[];
+}
+
+export interface DeepLink {
+  action: "open" | "install" | "play";
+  item: string;
 }
 
 export interface Installed {

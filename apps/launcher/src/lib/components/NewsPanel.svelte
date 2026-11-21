@@ -2,6 +2,8 @@
   import { t, tDyn } from "../i18n";
   import { date } from "../format";
   import type { Item } from "../types";
+  import { app } from "../store.svelte";
+  import { api } from "../api";
 
   let { item }: { item: Item } = $props();
 
@@ -42,8 +44,14 @@
       >
         <div class="track" style:transform="translateX(-{slide * 100}%)">
           {#each banners as b (b.id)}
-            <div class="slide">
-              <img src={b.image} alt={b.title ?? ""} loading="lazy" />
+            <div class="slide" class:link={!!b.url}>
+              <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+              <img
+                src={b.image}
+                alt={b.title ?? ""}
+                loading="lazy"
+                onclick={() => b.url && app.run(api.openNews(item.id, b.id))}
+              />
               {#if b.title}<span class="caption">{b.title}</span>{/if}
             </div>
           {/each}
@@ -67,10 +75,12 @@
     </div>
     <ul>
       {#each posts as p (p.id)}
-        <li>
-          <span class="cat {p.category}"></span>
-          <span class="title">{p.title}</span>
-          <span class="date">{date(p.date)}</span>
+        <li class:link={!!p.url}>
+          <button disabled={!p.url} onclick={() => app.run(api.openNews(item.id, p.id))}>
+            <span class="cat {p.category}"></span>
+            <span class="title">{p.title}</span>
+            <span class="date">{date(p.date)}</span>
+          </button>
         </li>
       {:else}
         <li class="muted">{t("news.empty")}</li>
@@ -171,6 +181,21 @@
     border-radius: var(--radius-sm);
     font-size: 0.93em;
     color: var(--text-2);
+  }
+  li button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 100%;
+    text-align: left;
+    cursor: default;
+  }
+  li.link button {
+    cursor: pointer;
+  }
+  .slide.link img {
+    cursor: pointer;
   }
   li:hover {
     background: rgb(255 255 255 / 0.05);

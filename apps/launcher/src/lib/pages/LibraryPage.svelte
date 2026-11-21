@@ -4,8 +4,11 @@
   import { t, tDyn } from "../i18n";
 
   let filter = $state<"all" | "installed">("all");
+  let showHidden = $state(false);
   const items = $derived(
-    app.visibleItems.filter((i) => filter === "all" || app.library[i.id] || app.activeJob(i.id)),
+    (showHidden ? app.orderedItems : app.visibleItems).filter(
+      (i) => filter === "all" || app.library[i.id] || app.activeJob(i.id),
+    ),
   );
 </script>
 
@@ -17,6 +20,11 @@
       <button class:on={filter === "installed"} onclick={() => (filter = "installed")}>
         {t("library.installed")}
       </button>
+      {#if app.settings.hiddenItems.length}
+        <button class:on={showHidden} onclick={() => (showHidden = !showHidden)}>
+          {t("library.showHidden")}
+        </button>
+      {/if}
     </div>
   </div>
   <div class="grid">
@@ -25,7 +33,9 @@
       <button
         class="tile"
         style:--item-accent={item.media.accent ?? "var(--accent)"}
+        class:hidden-item={app.isHidden(item.id)}
         onclick={() => app.go({ page: "item", id: item.id })}
+        oncontextmenu={(e) => app.openContext(e, app.itemMenu(item))}
       >
         <div class="art">
           {#if item.media.cover}
@@ -94,6 +104,9 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
     gap: 22px;
+  }
+  .tile.hidden-item {
+    opacity: 0.5;
   }
   .tile {
     text-align: left;
